@@ -70,6 +70,11 @@ protected:
     virtual std::vector<std::byte> saveExtraState() const { return {}; }
     virtual bool loadExtraState(std::span<const std::byte>) { return true; }
 
+    // Valid only while process(), processAudio(), onEvent(), or processFinished()
+    // is executing. This exposes raw CLAP block context without wrapping transport
+    // or other process-level data in a second framework abstraction.
+    const clap_process_t* currentProcess() const noexcept { return currentProcess_; }
+
     bool requestGuiResize(std::uint32_t width, std::uint32_t height) noexcept;
     void markStateDirty() noexcept;
 
@@ -166,6 +171,7 @@ private:
     RemoteControls remoteControls_;
     std::unique_ptr<GuiDelegate> gui_;
     GuiParamQueue guiParamQueue_;
+    const clap_process_t* currentProcess_ = nullptr;
     const clap_output_events_t* currentOutputEvents_ = nullptr;
     std::uint32_t currentFrameCount_ = 0;
 };
