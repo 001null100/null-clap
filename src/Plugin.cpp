@@ -123,7 +123,15 @@ clap_process_status Plugin::process(const clap_process_t* process) noexcept
         if (event == nullptr)
             continue;
 
-        const std::uint32_t eventTime = std::clamp(event->time, cursor, process->frames_count);
+        // CLAP event timestamps are sample offsets within the current process buffer.
+        // An event at frames_count (or beyond it) is outside the range we actually
+        // process, so it must not mutate plugin state during this call. Hosts deliver
+        // events sorted by time, which lets us stop once the first out-of-range event
+        // is encountered.
+        if (event->time >= process->frames_count)
+            break;
+
+        const std::uint32_t eventTime = std::max(event->time, cursor);
         if (eventTime > cursor)
             processAudio(*process, cursor, eventTime);
 
