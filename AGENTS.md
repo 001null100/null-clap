@@ -5,9 +5,9 @@ This repository is shared infrastructure for bespoke CLAP plug-ins. Treat change
 ## Core rules
 
 1. **CLAP semantics stay visible.** Do not build abstractions that erase the difference between base parameter values, modulation amounts, automation gestures, process events, flush events, or host callbacks.
-2. **No application logic.** Physics, glitch algorithms, synth voices, sequencers, visual themes, and Bitwig mappings belong in consuming repositories.
+2. **No application logic.** Physics, glitch algorithms, synth voices, sequencers, MIDI interpretation, visual themes, and Bitwig mappings belong in consuming repositories.
 3. **No realtime hazards.** `Plugin::process()`, `processAudio()`, and event handlers must not allocate, lock mutexes, touch files, log routinely, perform network I/O, or call host functions that are not explicitly audio-thread safe.
-4. **Stable IDs are contracts.** Never casually change an existing plug-in parameter ID, audio-port ID, or remote-page ID. State and automation depend on them.
+4. **Stable IDs are contracts.** Never casually change an existing plug-in parameter ID, audio-port ID, note-port ID, or remote-page ID. State, routing and automation depend on them.
 5. **Prefer standard stable CLAP extensions.** Draft extensions require a concrete need, explicit documentation, and tests.
 6. **Do not add a generic DSP framework.** null-clap is host plumbing, not an audio engine.
 7. **Keep dependencies pinned.** Dependency upgrades are standalone changes and must pass the full CI/validator matrix.
@@ -27,6 +27,13 @@ This repository is shared infrastructure for bespoke CLAP plug-ins. Treat change
 - `effectiveValue()` is clamped `base + modulation`.
 - Polyphonic events are currently intentionally *not* consumed by the framework. Surface them through `Plugin::onEvent()` until a real voice-aware plug-in provides requirements.
 - Read-only telemetry parameters should set `persistent = false` unless there is a clear reason to restore them.
+
+## Note and MIDI ports
+
+- Port declaration belongs in the framework; MIDI/note meaning belongs in the consuming plug-in.
+- Prefer `NotePortSpec::midi()` when the application consumes ordinary `CLAP_EVENT_MIDI` messages.
+- Do not advertise dialects the application cannot actually interpret.
+- Keep note-port configuration fixed while active, as required by CLAP.
 
 ## Threading
 
