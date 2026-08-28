@@ -2,9 +2,9 @@
 
 A small C++20 framework for building bespoke, CLAP-first audio plugins.
 
-`null-clap` exists to keep host/plugin plumbing out of individual projects. It wraps the official CLAP API and `clap-helpers`, then provides the reusable pieces that keep recurring in personal Bitwig plugins: plugin lifecycle, parameters, sample-accurate event dispatch, state, audio-port descriptions, remote-control pages, GUI delegation, and validator-backed builds.
+`null-clap` exists to keep host/plugin plumbing out of individual projects. It wraps the official CLAP API and `clap-helpers`, then provides the reusable pieces that keep recurring in personal Bitwig plugins: plugin lifecycle, parameters, sample-accurate event dispatch, state, audio/note-port descriptions, remote-control pages, GUI delegation, and validator-backed builds.
 
-The framework deliberately does **not** contain DSP, physics, synthesis, sequencing, or application-specific UI. A plugin should own its musical behavior; `null-clap` owns the boring contract with the host.
+The framework deliberately does **not** contain DSP, physics, synthesis, sequencing, MIDI interpretation, or application-specific UI. A plugin should own its musical behavior; `null-clap` owns the boring contract with the host.
 
 ## Design goals
 
@@ -25,10 +25,11 @@ The initial framework provides:
 - Sample-offset event segmentation through the plug-in process callback.
 - Versioned binary parameter state save/load with host synchronization after restore.
 - Declarative audio-port lists.
+- Declarative note-port lists, including raw MIDI dialect ports for controller/event input.
 - Declarative CLAP remote-control pages.
 - A toolkit-agnostic GUI delegate interface, suitable for a JUCE-component adapter in a consuming plug-in.
 - `SinglePluginFactory` and a compact entry-point helper.
-- A minimal stereo gain effect proving the full lifecycle.
+- A minimal stereo gain effect proving the full lifecycle and note-port contract.
 - Windows/Linux CI plus `clap-validator` validation.
 
 Polyphonic parameter modulation is intentionally **not** abstracted yet. The core event is surfaced to plug-ins so the first project that genuinely needs per-note state can drive the design instead of us inventing a voice framework in advance.
