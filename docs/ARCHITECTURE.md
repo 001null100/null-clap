@@ -12,7 +12,7 @@ Bitwig / CLAP host
         v
    null-clap
         |
-        +---- parameter/event/state/audio-port plumbing
+        +---- parameter/event/state/audio+note-port plumbing
         +---- GUI hosting boundary
         +---- remote-control pages
         |
@@ -20,6 +20,7 @@ Bitwig / CLAP host
  consuming plug-in
         |
         +---- DSP / physics / sequencing / analysis
+        +---- MIDI/note interpretation
         +---- application UI
         +---- plug-in-specific Bitwig integration
 ```
@@ -42,6 +43,7 @@ Provides checked C++ glue for CLAP callbacks and host extension access. Debug bu
 
 - `ParameterStore`
 - `AudioPorts`
+- `NotePorts`
 - `RemoteControls`
 - state serialization
 - toolkit-neutral `GuiDelegate`
@@ -50,7 +52,9 @@ Provides checked C++ glue for CLAP callbacks and host extension access. Debug bu
 
 ### Application plug-in
 
-Subclass `nullclap::Plugin`, register parameters/ports/pages in the constructor, and implement `processAudio()`. Raw events are available through `onEvent()`.
+Subclass `nullclap::Plugin`, register parameters/audio ports/note ports/pages in the constructor, and implement `processAudio()`. Raw events are available through `onEvent()`.
+
+`NotePorts` only describes the event endpoints and supported CLAP dialects. It does not decide what a MIDI CC, note, MPE gesture or MIDI 2.0 message means. That interpretation remains application behavior.
 
 ## Process timeline
 
@@ -67,6 +71,8 @@ For a block with events at samples 117 and 305:
 
 `processAudio(process, start, end)` therefore sees parameter state that is valid for exactly that span.
 
+Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed.
+
 This is a central framework invariant. Do not move parameter event handling to a timer, GUI callback, or once-per-block polling path.
 
 ## Extension policy
@@ -76,6 +82,7 @@ Stable standard CLAP extensions are preferred. The initial framework implements:
 - params
 - state
 - audio-ports
+- note-ports
 - remote-controls
 - gui when a delegate is present
 
