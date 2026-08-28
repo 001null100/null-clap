@@ -24,7 +24,7 @@ struct AudioPortSpec
         result.id = id;
         result.name = std::move(name);
         result.channelCount = 2;
-        result.flags = main ? CLAP_AUDIO_PORT_IS_MAIN : 0u;
+        result.flags = main ? static_cast<std::uint32_t>(CLAP_AUDIO_PORT_IS_MAIN) : 0u;
         result.portType = CLAP_PORT_STEREO;
         return result;
     }
@@ -35,7 +35,7 @@ struct AudioPortSpec
         result.id = id;
         result.name = std::move(name);
         result.channelCount = 1;
-        result.flags = main ? CLAP_AUDIO_PORT_IS_MAIN : 0u;
+        result.flags = main ? static_cast<std::uint32_t>(CLAP_AUDIO_PORT_IS_MAIN) : 0u;
         result.portType = CLAP_PORT_MONO;
         return result;
     }
