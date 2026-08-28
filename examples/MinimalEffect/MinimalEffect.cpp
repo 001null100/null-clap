@@ -33,6 +33,7 @@ MinimalEffect::MinimalEffect(const clap_host_t* host)
     auto gain = nullclap::ParameterSpec::continuous(gainId, "Gain", "Main", -60.0, 12.0, 0.0);
     gain.unit = "dB";
     gain.displayPrecision = 2;
+    gain.flags |= static_cast<std::uint32_t>(CLAP_PARAM_REQUIRES_PROCESS);
     parameters().add(std::move(gain));
 
     auto input = nullclap::AudioPortSpec::stereo(0, "Stereo Input", true);
