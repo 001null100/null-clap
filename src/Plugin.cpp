@@ -108,6 +108,7 @@ clap_process_status Plugin::process(const clap_process_t* process) noexcept
     if (process == nullptr)
         return CLAP_PROCESS_ERROR;
 
+    currentProcess_ = process;
     currentOutputEvents_ = process->out_events;
     currentFrameCount_ = process->frames_count;
     drainGuiParameterEvents(process->out_events, 0);
@@ -133,9 +134,11 @@ clap_process_status Plugin::process(const clap_process_t* process) noexcept
     if (cursor < process->frames_count)
         processAudio(*process, cursor, process->frames_count);
 
+    const auto status = processFinished();
+    currentProcess_ = nullptr;
     currentOutputEvents_ = nullptr;
     currentFrameCount_ = 0;
-    return processFinished();
+    return status;
 }
 
 std::uint32_t Plugin::paramsCount() const noexcept
