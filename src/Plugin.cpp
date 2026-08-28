@@ -224,6 +224,16 @@ bool Plugin::audioPortsInfo(std::uint32_t index, bool isInput, clap_audio_port_i
     return info != nullptr && audioPorts_.info(index, isInput, *info);
 }
 
+std::uint32_t Plugin::notePortsCount(bool isInput) const noexcept
+{
+    return notePorts_.count(isInput);
+}
+
+bool Plugin::notePortsInfo(std::uint32_t index, bool isInput, clap_note_port_info_t* info) const noexcept
+{
+    return info != nullptr && notePorts_.info(index, isInput, *info);
+}
+
 std::uint32_t Plugin::remoteControlsPageCount() noexcept
 {
     return remoteControls_.count();

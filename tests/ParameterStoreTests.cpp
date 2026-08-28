@@ -1,4 +1,5 @@
 #include <nullclap/Id.hpp>
+#include <nullclap/NotePorts.hpp>
 #include <nullclap/ParameterStore.hpp>
 
 #include <cassert>
@@ -54,6 +55,20 @@ int main()
     valueEvent.value = -30.0;
     assert(!store.applyInputEvent(valueEvent.header));
     assert(store.value(stableId("test.gain")) == -12.0);
+
+    NotePorts ports;
+    const auto midiPortId = stableId("test.note.midi-in");
+    ports.addInput(NotePortSpec::midi(midiPortId, "MIDI Input"));
+    assert(ports.count(true) == 1);
+    assert(ports.count(false) == 0);
+
+    clap_note_port_info_t noteInfo {};
+    assert(ports.info(0, true, noteInfo));
+    assert(noteInfo.id == midiPortId);
+    assert(noteInfo.supported_dialects == CLAP_NOTE_DIALECT_MIDI);
+    assert(noteInfo.preferred_dialect == CLAP_NOTE_DIALECT_MIDI);
+    assert(std::strcmp(noteInfo.name, "MIDI Input") == 0);
+    assert(!ports.info(1, true, noteInfo));
 
     return 0;
 }

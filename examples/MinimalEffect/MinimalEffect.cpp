@@ -43,6 +43,11 @@ MinimalEffect::MinimalEffect(const clap_host_t* host)
     audioPorts().addInput(std::move(input));
     audioPorts().addOutput(std::move(output));
 
+    // The example does not interpret MIDI, but exposing a real MIDI note port makes
+    // clap-validator exercise null-clap's note-port extension plumbing.
+    notePorts().addInput(nullclap::NotePortSpec::midi(
+        nullclap::stableId("minimal.note.midi-in"), "MIDI Input"));
+
     nullclap::RemoteControlPage page;
     page.id = nullclap::stableId("minimal.remote.main");
     page.section = "Main";
