@@ -196,16 +196,24 @@ std::vector<ParameterStore::SavedValue> ParameterStore::persistentValues() const
     std::vector<SavedValue> result;
     result.reserve(parameters_.size());
     for (const auto& parameter : parameters_)
-        if (parameter->spec.persistent)
+    {
+        const bool readOnly = (parameter->spec.flags & CLAP_PARAM_IS_READONLY) != 0;
+        if (parameter->spec.persistent || !readOnly)
             result.push_back({ parameter->spec.id, parameter->base.load(std::memory_order_relaxed) });
+    }
     return result;
 }
 
 bool ParameterStore::restorePersistentValue(clap_id id, double restoredValue) noexcept
 {
     auto* parameter = find(id);
-    if (parameter == nullptr || !parameter->spec.persistent)
+    if (parameter == nullptr)
         return false;
+
+    const bool readOnly = (parameter->spec.flags & CLAP_PARAM_IS_READONLY) != 0;
+    if (!parameter->spec.persistent && readOnly)
+        return false;
+
     return setBaseValue(id, restoredValue, true);
 }
 

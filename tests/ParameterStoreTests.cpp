@@ -56,6 +56,37 @@ int main()
     assert(!store.applyInputEvent(valueEvent.header));
     assert(store.value(stableId("test.gain")) == -12.0);
 
+    // Writable CLAP parameters must participate in state even when a plug-in marks
+    // them as non-persistent internally. Hosts may set any writable parameter and
+    // expect state save/load to reproduce that value.
+    const auto transientWritableId = stableId("test.transient-writable");
+    auto transientWritable = ParameterSpec::continuous(
+        transientWritableId, "Transient Writable", "Main", 0.0, 1.0, 0.0);
+    transientWritable.persistent = false;
+    assert(store.add(std::move(transientWritable)));
+    assert(store.setBaseValue(transientWritableId, 0.75));
+
+    // Read-only telemetry can still opt out of state.
+    const auto transientReadOnlyId = stableId("test.transient-readonly");
+    auto transientReadOnly = ParameterSpec::continuous(
+        transientReadOnlyId, "Transient Readonly", "Main", 0.0, 1.0, 0.0, CLAP_PARAM_IS_READONLY);
+    transientReadOnly.persistent = false;
+    assert(store.add(std::move(transientReadOnly)));
+    assert(store.setInternalValue(transientReadOnlyId, 0.8));
+
+    bool savedWritable = false;
+    bool savedReadOnly = false;
+    for (const auto& saved : store.persistentValues())
+    {
+        savedWritable |= saved.id == transientWritableId;
+        savedReadOnly |= saved.id == transientReadOnlyId;
+    }
+    assert(savedWritable);
+    assert(!savedReadOnly);
+    assert(store.restorePersistentValue(transientWritableId, 0.25));
+    assert(std::abs(store.value(transientWritableId) - 0.25) < 1.0e-9);
+    assert(!store.restorePersistentValue(transientReadOnlyId, 0.25));
+
     NotePorts ports;
     const auto midiPortId = stableId("test.note.midi-in");
     ports.addInput(NotePortSpec::midi(midiPortId, "MIDI Input"));
