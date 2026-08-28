@@ -84,3 +84,66 @@ jobs:
         with:
           name: NullClapMinimalEffect-${{ runner.os }}
           path: build/clap/NullClapMinimalEffect.clap
+
+  release:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(github.event.head_commit.message, 'release:')
+    needs: build-and-validate
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated examples
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package example builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          test -d artifacts/NullClapMinimalEffect-Windows
+          test -d artifacts/NullClapMinimalEffect-Linux
+          (cd artifacts/NullClapMinimalEffect-Windows && zip -qr ../../release/NullClapMinimalEffect-Windows.zip .)
+          (cd artifacts/NullClapMinimalEffect-Linux && tar -czf ../../release/NullClapMinimalEffect-Linux.tar.gz .)
+
+      - name: Publish versioned release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -nE 's/.*project\(null-clap VERSION ([0-9.]+).*/\1/p' CMakeLists.txt | head -n 1)"
+          test -n "$VERSION"
+          TAG="v${VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+          cat > release-notes.md <<EOF
+          null-clap ${TAG} is the first validator-backed framework release.
+
+          Highlights:
+          - C++20 CLAP-first plug-in base on the official CLAP API and clap-helpers
+          - sample-accurate automation and monophonic modulation
+          - stable native-unit parameters and GUI gestures
+          - deterministic, versioned state with host parameter rescan on restore
+          - declarative audio ports and remote controls
+          - toolkit-independent GUI delegation
+          - Windows and Linux builds validated by clap-validator 0.4.1
+
+          The attached MinimalEffect builds are smoke-test/example CLAP modules, not a separate product.
+          EOF
+
+          gh release create "$TAG" release/* \
+            --target "$GITHUB_SHA" \
+            --title "null-clap ${TAG}" \
+            --notes-file release-notes.md
