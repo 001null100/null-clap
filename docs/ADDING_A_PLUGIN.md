@@ -49,31 +49,47 @@ private:
     void processAudio(const clap_process_t&,
                       std::uint32_t start,
                       std::uint32_t end) noexcept override;
+    void onEvent(const clap_event_header_t&) noexcept override;
 };
 ```
 
-The constructor registers fixed parameters, audio ports and remote pages. No host callbacks are used from the constructor; CLAP host access becomes valid during `init()`.
+The constructor registers fixed parameters, audio ports, note ports and remote pages. No host callbacks are used from the constructor; CLAP host access becomes valid during `init()`.
 
 ## 3. Give everything stable IDs
 
 ```cpp
 static constexpr auto mixId = nullclap::stableId("my-plugin.mix");
 static constexpr auto inputId = nullclap::stableId("my-plugin.audio.main-in");
+static constexpr auto midiInputId = nullclap::stableId("my-plugin.note.midi-in");
 ```
 
 Keep the strings stable once projects can be saved with the plug-in.
 
-## 4. Process spans, not imaginary whole blocks
+## 4. Declare event inputs when you need them
 
-Implement `processAudio()` under the assumption that a parameter event may have split the host block immediately before `start`. Query `effectiveValue()` inside the span and apply your own smoothing when appropriate.
+A plug-in that expects raw MIDI must advertise a note port. For ordinary MIDI 1.0 input:
 
-## 5. Handle non-parameter events explicitly
+```cpp
+notePorts().addInput(nullclap::NotePortSpec::midi(midiInputId, "MIDI Input"));
+```
 
-Override `onEvent()` for note/MIDI/transport/custom events. The framework applies global parameter events first, then forwards every event to this hook.
+`NotePortSpec::midi()` advertises `CLAP_NOTE_DIALECT_MIDI` as both the supported and preferred dialect. Use `NotePortSpec::dialects()` only when the application genuinely understands additional CLAP note dialects.
+
+The framework describes the port; the consuming plug-in decides what the incoming events mean.
+
+## 5. Process spans, not imaginary whole blocks
+
+Implement `processAudio()` under the assumption that a parameter or other input event may have split the host block immediately before `start`. Query `effectiveValue()` inside the span and apply your own smoothing when appropriate.
+
+## 6. Handle non-parameter events explicitly
+
+Override `onEvent()` for note/MIDI/transport/custom events. The framework applies global parameter events first, then forwards every event to this hook at its original sample offset.
+
+For a raw MIDI port, inspect `CLAP_EVENT_MIDI` and cast the header to `clap_event_midi_t`. MIDI interpretation is application logic and intentionally not hidden by null-clap.
 
 Per-note parameter events also arrive here and are not consumed into the monophonic store.
 
-## 6. Export the CLAP entry
+## 7. Export the CLAP entry
 
 `Entry.cpp`:
 
@@ -86,11 +102,11 @@ NULLCLAP_DEFINE_ENTRY(MyPlugin);
 
 The framework supplies the one-plug-in factory and defensive CLAP 1.2 entry init/deinit counting.
 
-## 7. Add a GUI only if needed
+## 8. Add a GUI only if needed
 
 Implement `nullclap::GuiDelegate` in the application repository. JUCE-based plug-ins should keep JUCE there, not add it to null-clap.
 
-## 8. Validate before DAW testing
+## 9. Validate before DAW testing
 
 Every plug-in repository should copy the same principle as null-clap CI: compile, run local tests, then run `clap-validator` before publishing an artifact.
 
