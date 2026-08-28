@@ -2,6 +2,7 @@
 
 #include "AudioPorts.hpp"
 #include "Gui.hpp"
+#include "NotePorts.hpp"
 #include "ParameterStore.hpp"
 #include "RemoteControls.hpp"
 #include "State.hpp"
@@ -35,6 +36,7 @@ public:
     ParameterStore& parameters() noexcept { return parameters_; }
     const ParameterStore& parameters() const noexcept { return parameters_; }
     AudioPorts& audioPorts() noexcept { return audioPorts_; }
+    NotePorts& notePorts() noexcept { return notePorts_; }
     RemoteControls& remoteControls() noexcept { return remoteControls_; }
 
     void setGuiDelegate(std::unique_ptr<GuiDelegate> gui) noexcept;
@@ -124,6 +126,10 @@ private:
     std::uint32_t audioPortsCount(bool isInput) const noexcept override;
     bool audioPortsInfo(std::uint32_t index, bool isInput, clap_audio_port_info_t* info) const noexcept override;
 
+    bool implementsNotePorts() const noexcept override { return true; }
+    std::uint32_t notePortsCount(bool isInput) const noexcept override;
+    bool notePortsInfo(std::uint32_t index, bool isInput, clap_note_port_info_t* info) const noexcept override;
+
     bool implementRemoteControls() const noexcept override { return true; }
     std::uint32_t remoteControlsPageCount() noexcept override;
     bool remoteControlsPageGet(std::uint32_t index, clap_remote_controls_page_t* page) noexcept override;
@@ -156,6 +162,7 @@ private:
 
     ParameterStore parameters_;
     AudioPorts audioPorts_;
+    NotePorts notePorts_;
     RemoteControls remoteControls_;
     std::unique_ptr<GuiDelegate> gui_;
     GuiParamQueue guiParamQueue_;
