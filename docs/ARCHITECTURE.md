@@ -73,6 +73,8 @@ For a block with events at samples 117 and 305:
 
 Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed.
 
+Event handlers that need block-level information such as the initial transport structure may call the protected `currentProcess()` accessor. It returns the host's raw `clap_process_t` only while the current `process()` call is active. null-clap deliberately does not wrap that transport/process context in a parallel abstraction.
+
 This is a central framework invariant. Do not move parameter event handling to a timer, GUI callback, or once-per-block polling path.
 
 ## Extension policy
@@ -99,4 +101,4 @@ More extensions should be added when a real plug-in needs them. Audio-port activ
 - JUCE dependency
 - Bitwig controller-extension transport
 
-The raw CLAP event hook makes these possible without forcing premature generic designs.
+The raw CLAP event hook and process-context accessor make these possible without forcing premature generic designs.
