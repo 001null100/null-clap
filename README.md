@@ -23,7 +23,7 @@ The initial framework provides:
 - `nullclap::Plugin`, a reusable CLAP plug-in base built on `clap-helpers`.
 - `ParameterStore` with stable IDs, native ranges, automation values, monophonic modulation and GUI-originated gestures.
 - Sample-offset event segmentation through the plug-in process callback.
-- Versioned binary parameter state save/load.
+- Versioned binary parameter state save/load with host synchronization after restore.
 - Declarative audio-port lists.
 - Declarative CLAP remote-control pages.
 - A toolkit-agnostic GUI delegate interface, suitable for a JUCE-component adapter in a consuming plug-in.
@@ -41,14 +41,14 @@ include(FetchContent)
 FetchContent_Declare(
     null_clap
     GIT_REPOSITORY https://github.com/001null100/null-clap.git
-    GIT_TAG main
+    GIT_TAG v0.1.0
 )
 FetchContent_MakeAvailable(null_clap)
 
 target_link_libraries(MyPlugin PRIVATE nullclap::nullclap)
 ```
 
-For real plug-ins, pin `GIT_TAG` to a commit rather than following `main`.
+Pin consuming plug-ins to a release tag or exact commit. Do not follow `main` unless you are deliberately testing framework development.
 
 See [`docs/ADDING_A_PLUGIN.md`](docs/ADDING_A_PLUGIN.md) for the intended project structure and [`examples/MinimalEffect`](examples/MinimalEffect) for a complete implementation.
 
@@ -76,6 +76,12 @@ Dependencies are pinned in the root `CMakeLists.txt` rather than floating silent
 - `clap-helpers` commit `c35dd4906bd8efbb900cb2b89e680fed463cc8b1`
 
 The CLAP 1.x ABI is stable, but source APIs and helper behavior still evolve. Updating either dependency should be an explicit change followed by the complete test and validator pass.
+
+## Releases
+
+A commit whose message begins with `release:` is eligible for publication only after the Windows and Linux matrix has built the framework and example, passed unit tests, and passed `clap-validator`. The release job derives the tag from the CMake project version and refuses to overwrite an existing release.
+
+Release assets include validated Windows and Linux builds of `NullClapMinimalEffect` as smoke-test/reference modules. The framework itself is consumed from the tagged source tree.
 
 ## Documentation
 
