@@ -1,0 +1,97 @@
+# Adding a bespoke plug-in
+
+The expected shape of a consuming repository is deliberately small:
+
+```text
+MyPlugin/
+    CMakeLists.txt
+    Source/
+        Plugin.hpp
+        Plugin.cpp
+        Entry.cpp
+        Dsp/...
+        UI/...
+```
+
+## 1. Fetch null-clap
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    null_clap
+    GIT_REPOSITORY https://github.com/001null100/null-clap.git
+    GIT_TAG <PINNED-COMMIT>
+)
+FetchContent_MakeAvailable(null_clap)
+```
+
+Then create the module:
+
+```cmake
+nullclap_add_plugin(MyPlugin
+    OUTPUT_NAME MyPlugin
+    SOURCES
+        Source/Plugin.cpp
+        Source/Entry.cpp
+)
+```
+
+## 2. Define a plug-in class
+
+```cpp
+class MyPlugin final : public nullclap::Plugin
+{
+public:
+    static const clap_plugin_descriptor_t& descriptor() noexcept;
+    explicit MyPlugin(const clap_host_t* host);
+
+private:
+    void processAudio(const clap_process_t&,
+                      std::uint32_t start,
+                      std::uint32_t end) noexcept override;
+};
+```
+
+The constructor registers fixed parameters, audio ports and remote pages. No host callbacks are used from the constructor; CLAP host access becomes valid during `init()`.
+
+## 3. Give everything stable IDs
+
+```cpp
+static constexpr auto mixId = nullclap::stableId("my-plugin.mix");
+static constexpr auto inputId = nullclap::stableId("my-plugin.audio.main-in");
+```
+
+Keep the strings stable once projects can be saved with the plug-in.
+
+## 4. Process spans, not imaginary whole blocks
+
+Implement `processAudio()` under the assumption that a parameter event may have split the host block immediately before `start`. Query `effectiveValue()` inside the span and apply your own smoothing when appropriate.
+
+## 5. Handle non-parameter events explicitly
+
+Override `onEvent()` for note/MIDI/transport/custom events. The framework applies global parameter events first, then forwards every event to this hook.
+
+Per-note parameter events also arrive here and are not consumed into the monophonic store.
+
+## 6. Export the CLAP entry
+
+`Entry.cpp`:
+
+```cpp
+#include "Plugin.hpp"
+#include <nullclap/Entry.hpp>
+
+NULLCLAP_DEFINE_ENTRY(MyPlugin);
+```
+
+The framework supplies the one-plug-in factory and defensive CLAP 1.2 entry init/deinit counting.
+
+## 7. Add a GUI only if needed
+
+Implement `nullclap::GuiDelegate` in the application repository. JUCE-based plug-ins should keep JUCE there, not add it to null-clap.
+
+## 8. Validate before DAW testing
+
+Every plug-in repository should copy the same principle as null-clap CI: compile, run local tests, then run `clap-validator` before publishing an artifact.
+
+For a Bitwig-only personal plug-in, `.clap` is the primary artifact. Do not add VST3 merely out of habit.

@@ -3,6 +3,7 @@
 #include "Factory.hpp"
 
 #include <clap/entry.h>
+#include <cstdint>
 #include <cstring>
 #include <mutex>
 

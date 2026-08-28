@@ -1,8 +1,8 @@
 #pragma once
 
 #include <clap/factory/plugin-factory.h>
+#include <cstdint>
 #include <cstring>
-#include <new>
 
 namespace nullclap
 {

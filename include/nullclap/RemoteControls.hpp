@@ -3,6 +3,7 @@
 #include <clap/ext/remote-controls.h>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <utility>

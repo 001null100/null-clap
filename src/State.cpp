@@ -8,7 +8,10 @@ namespace nullclap::state
 {
 namespace
 {
-constexpr std::byte magic[] { std::byte{'N'}, std::byte{'C'}, std::byte{'L'}, std::byte{'P'} };
+constexpr std::byte magic[] {
+    static_cast<std::byte>('N'), static_cast<std::byte>('C'),
+    static_cast<std::byte>('L'), static_cast<std::byte>('P')
+};
 
 bool writeBytes(const clap_ostream_t* stream, const std::byte* data, std::size_t size) noexcept
 {

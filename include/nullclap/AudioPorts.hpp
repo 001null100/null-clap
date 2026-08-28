@@ -1,7 +1,7 @@
 #pragma once
 
 #include <clap/ext/audio-ports.h>
-#include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <utility>

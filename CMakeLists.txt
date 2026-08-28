@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.24)
 project(null-clap VERSION 0.1.0 LANGUAGES C CXX)
 
 include(FetchContent)
-include(GNUInstallDirs)
 
 option(NULLCLAP_BUILD_EXAMPLES "Build null-clap example plugins" ON)
 option(NULLCLAP_BUILD_TESTS "Build null-clap unit tests" ON)
@@ -35,11 +34,7 @@ add_library(nullclap::nullclap ALIAS nullclap)
 
 target_compile_features(nullclap PUBLIC cxx_std_20)
 target_link_libraries(nullclap PUBLIC clap clap-helpers)
-target_include_directories(nullclap
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
+target_include_directories(nullclap PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(nullclap PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
@@ -61,7 +56,3 @@ if(NULLCLAP_BUILD_TESTS)
     target_compile_features(nullclap_tests PRIVATE cxx_std_20)
     add_test(NAME nullclap_parameter_store COMMAND nullclap_tests)
 endif()
-
-install(TARGETS nullclap EXPORT nullclapTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(EXPORT nullclapTargets NAMESPACE nullclap:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/null-clap)
