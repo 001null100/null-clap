@@ -5,6 +5,7 @@
 #include "Factory.hpp"
 #include "Gui.hpp"
 #include "Id.hpp"
+#include "NotePorts.hpp"
 #include "Parameter.hpp"
 #include "ParameterStore.hpp"
 #include "Plugin.hpp"
