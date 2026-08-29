@@ -178,7 +178,7 @@ private:
             wc.lpfnWndProc = &EventSnifferGui::windowProc;
             wc.hInstance = GetModuleHandleW(nullptr);
             wc.lpszClassName = windowClassName;
-            wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+            wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
             wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
             return RegisterClassW(&wc);
         }();
