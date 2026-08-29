@@ -8,6 +8,8 @@
 #include "NotePorts.hpp"
 #include "Parameter.hpp"
 #include "ParameterStore.hpp"
+#include "PhysicalPixelGuiSizing.hpp"
 #include "Plugin.hpp"
+#include "PluginFeatures.hpp"
 #include "RemoteControls.hpp"
 #include "State.hpp"
