@@ -1,3 +1,4 @@
+#include <nullclap/AudioPorts.hpp>
 #include <nullclap/Factory.hpp>
 #include <nullclap/Id.hpp>
 #include <nullclap/NotePorts.hpp>
@@ -6,6 +7,7 @@
 
 #include <cassert>
 #include <clap/events.h>
+#include <clap/ext/audio-ports.h>
 #include <clap/ext/note-ports.h>
 #include <clap/host.h>
 #include <clap/plugin.h>
@@ -63,39 +65,50 @@ struct OneEventList
     }
 };
 
-class MidiProbePlugin final : public nullclap::Plugin
+class MidiControlledEffectProbe final : public nullclap::Plugin
 {
 public:
-    static inline MidiProbePlugin* lastInstance = nullptr;
+    static inline MidiControlledEffectProbe* lastInstance = nullptr;
 
     static const clap_plugin_descriptor_t& descriptor() noexcept
     {
-        // Deliberately start as a plain audio effect. The target-level null-clap
-        // routing opt-in must augment this descriptor at the factory boundary.
         static const clap_plugin_descriptor_t value {
             CLAP_VERSION,
-            "dev.nullclap.tests-midi-probe",
-            "null-clap MIDI probe",
+            "dev.nullclap.tests-midi-controlled-effect",
+            "null-clap MIDI controlled effect probe",
             "null-clap",
             "https://github.com/001null100/null-clap",
             "",
             "",
             "0.1",
-            "Framework raw MIDI delivery probe",
-            nullclap::pluginFeatures::stereoAudioEffect.data(),
+            "Hybrid audio effect + instrument raw MIDI delivery probe",
+            nullclap::pluginFeatures::stereoMidiControlledAudioEffect.data(),
         };
         return value;
     }
 
-    explicit MidiProbePlugin(const clap_host_t* host)
+    explicit MidiControlledEffectProbe(const clap_host_t* host)
         : Plugin(&descriptor(), host)
     {
         lastInstance = this;
-        notePorts().addInput(nullclap::NotePortSpec::controllerInput(
-            nullclap::stableId("tests-midi-probe.input"), "MIDI Input"));
+
+        auto input = nullclap::AudioPortSpec::stereo(
+            nullclap::stableId("tests-midi-controlled-effect.audio-in"), "Stereo Input", true);
+        auto output = nullclap::AudioPortSpec::stereo(
+            nullclap::stableId("tests-midi-controlled-effect.audio-out"), "Stereo Output", true);
+        input.inPlacePair = output.id;
+        output.inPlacePair = input.id;
+        audioPorts().addInput(std::move(input));
+        audioPorts().addOutput(std::move(output));
+
+        notePorts().addInput(nullclap::NotePortSpec::dialects(
+            nullclap::stableId("tests-midi-controlled-effect.midi-in"),
+            "MIDI Input",
+            CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP,
+            CLAP_NOTE_DIALECT_MIDI));
     }
 
-    ~MidiProbePlugin() override
+    ~MidiControlledEffectProbe() override
     {
         if (lastInstance == this)
             lastInstance = nullptr;
@@ -127,22 +140,29 @@ private:
 int main()
 {
     auto host = makeHost();
-    const auto* factory = nullclap::SinglePluginFactory<MidiProbePlugin>::get();
+    const auto* factory = nullclap::SinglePluginFactory<MidiControlledEffectProbe>::get();
     assert(factory->get_plugin_count(factory) == 1);
 
     const auto* descriptor = factory->get_plugin_descriptor(factory, 0);
     assert(descriptor != nullptr);
     assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_AUDIO_EFFECT));
+    assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_INSTRUMENT));
     assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_STEREO));
-    assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_NOTE_EFFECT));
+    assert(!descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_NOTE_EFFECT));
 
     const auto* plugin = factory->create_plugin(factory, &host, descriptor->id);
     assert(plugin != nullptr);
     assert(plugin->desc == descriptor);
-    auto* instance = MidiProbePlugin::lastInstance;
+    auto* instance = MidiControlledEffectProbe::lastInstance;
     assert(instance != nullptr);
 
     assert(plugin->init(plugin));
+
+    const auto* audioPorts = static_cast<const clap_plugin_audio_ports_t*>(
+        plugin->get_extension(plugin, CLAP_EXT_AUDIO_PORTS));
+    assert(audioPorts != nullptr);
+    assert(audioPorts->count(plugin, true) == 1);
+    assert(audioPorts->count(plugin, false) == 1);
 
     const auto* notePorts = static_cast<const clap_plugin_note_ports_t*>(
         plugin->get_extension(plugin, CLAP_EXT_NOTE_PORTS));
@@ -151,8 +171,8 @@ int main()
     clap_note_port_info_t inputInfo {};
     assert(notePorts->get(plugin, 0, true, &inputInfo));
     assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_MIDI) != 0);
-    assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_MIDI_MPE) != 0);
     assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_CLAP) != 0);
+    assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_MIDI_MPE) == 0);
     assert(inputInfo.preferred_dialect == CLAP_NOTE_DIALECT_MIDI);
 
     assert(plugin->activate(plugin, 48000.0, 1, 64));
@@ -183,6 +203,6 @@ int main()
     plugin->stop_processing(plugin);
     plugin->deactivate(plugin);
     plugin->destroy(plugin);
-    assert(MidiProbePlugin::lastInstance == nullptr);
+    assert(MidiControlledEffectProbe::lastInstance == nullptr);
     return 0;
 }
