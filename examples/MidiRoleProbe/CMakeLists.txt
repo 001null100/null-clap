@@ -1,0 +1,7 @@
+set(_probe_common ProbePlugin.hpp RoleDefinitions.hpp)
+
+nullclap_add_plugin(NullClapMidiProbeAudioEffect OUTPUT_NAME NullClapMidiProbeAudioEffect SOURCES AudioEffectEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbeAudioNoteEffect OUTPUT_NAME NullClapMidiProbeAudioNoteEffect SOURCES AudioNoteEffectEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbeAudioInstrument OUTPUT_NAME NullClapMidiProbeAudioInstrument SOURCES AudioInstrumentEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbeAllRoles OUTPUT_NAME NullClapMidiProbeAllRoles SOURCES AllRolesEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbeInstrument OUTPUT_NAME NullClapMidiProbeInstrument SOURCES InstrumentEntry.cpp ${_probe_common})
