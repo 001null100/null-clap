@@ -15,6 +15,7 @@ Bitwig / CLAP host
         +---- parameter/event/state/audio+note-port plumbing
         +---- GUI hosting boundary
         +---- remote-control pages
+        +---- reusable host-facing descriptor feature profiles
         |
         v
  consuming plug-in
@@ -50,11 +51,21 @@ Provides checked C++ glue for CLAP callbacks and host extension access. Debug bu
 - a fixed-capacity GUI-to-host parameter event queue
 - sample-offset segmentation of `process()`
 
+`PluginFeatures.hpp` additionally provides explicit descriptor feature profiles. These are discovery/routing metadata, not runtime behavior. They are opt-in because a plug-in having a note port does not by itself make that plug-in a CLAP note effect.
+
 ### Application plug-in
 
 Subclass `nullclap::Plugin`, register parameters/audio ports/note ports/pages in the constructor, and implement `processAudio()`. Raw events are available through `onEvent()`.
 
 `NotePorts` only describes the event endpoints and supported CLAP dialects. It does not decide what a MIDI CC, note, MPE gesture or MIDI 2.0 message means. That interpretation remains application behavior.
+
+## Host-facing feature profiles
+
+A conventional stereo audio processor can use `nullclap::pluginFeatures::stereoAudioEffect`.
+
+For a processor that remains fundamentally an audio effect but also consumes the host's note/MIDI signal as first-class realtime input, `nullclap::pluginFeatures::stereoAudioEffectWithNoteInput` advertises both `audio-effect` and `note-effect`, plus `stereo`.
+
+This hybrid profile is intentionally explicit. Some hosts use descriptor categories when constructing their device/note routing topology independently of the `CLAP_EXT_NOTE_PORTS` declaration. A consuming plug-in should choose the hybrid profile only when it genuinely needs host note/MIDI routing while operating as an audio processor. null-clap does not infer descriptor categories from note ports.
 
 ## Process timeline
 
@@ -71,7 +82,7 @@ For a block with events at samples 117 and 305:
 
 `processAudio(process, start, end)` therefore sees parameter state that is valid for exactly that span.
 
-Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed.
+Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed. `tests/MidiInputTests.cpp` exercises that contract with a raw channel-16 CC event through a real `clap_process_t` event list.
 
 Event handlers that need block-level information such as the initial transport structure may call the protected `currentProcess()` accessor. It returns the host's raw `clap_process_t` only while the current `process()` call is active. null-clap deliberately does not wrap that transport/process context in a parallel abstraction.
 
