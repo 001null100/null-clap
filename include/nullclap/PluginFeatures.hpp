@@ -5,24 +5,25 @@
 
 namespace nullclap::pluginFeatures
 {
-// Conventional stereo audio effect with no host-routing implication beyond audio.
+// Conventional stereo audio effect.
 inline constexpr std::array<const char*, 3> stereoAudioEffect {
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
     CLAP_PLUGIN_FEATURE_STEREO,
     nullptr,
 };
 
-// Explicit opt-in profile for processors which are fundamentally audio effects but
-// also consume the host's note/MIDI signal as a first-class realtime input.
+// Stereo audio processor whose output is also driven by incoming note/MIDI
+// events. CLAP defines `instrument` as a plug-in that processes note events and
+// then produces audio; pairing it with `audio-effect` describes processors such
+// as MIDI-triggered gates, glitch effects, vocoders, and other hybrid effects
+// which retain a normal audio input/output path.
 //
-// Some hosts use descriptor categories when constructing their note-routing graph,
-// independently of the note-ports extension. Advertising both categories keeps the
-// audio-effect identity while making the note-input role visible at discovery time.
-// Do not use this profile merely because a plug-in exposes a note port for an
-// incidental purpose: CLAP's NOTE_EFFECT category is host-facing classification.
-inline constexpr std::array<const char*, 4> stereoAudioEffectWithNoteInput {
+// This is intentionally *not* a note-effect profile: note-effect is for plug-ins
+// that process or generate note events. Consumers should only add NOTE_EFFECT if
+// they actually expose a note output / sequencing role as well.
+inline constexpr std::array<const char*, 4> stereoMidiControlledAudioEffect {
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+    CLAP_PLUGIN_FEATURE_INSTRUMENT,
     CLAP_PLUGIN_FEATURE_STEREO,
     nullptr,
 };
