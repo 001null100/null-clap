@@ -26,20 +26,6 @@ struct NotePortSpec
         return result;
     }
 
-    // Controller-oriented input for applications that also accept native CLAP
-    // note events. Raw-MIDI input ports are normalized to advertise MIDI_MPE in
-    // NotePorts::info(), so callers do not need to opt into that compatibility
-    // flag individually.
-    static NotePortSpec controllerInput(clap_id id, std::string name)
-    {
-        NotePortSpec result;
-        result.id = id;
-        result.name = std::move(name);
-        result.supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
-        result.preferredDialect = CLAP_NOTE_DIALECT_MIDI;
-        return result;
-    }
-
     static NotePortSpec dialects(clap_id id,
                                  std::string name,
                                  std::uint32_t supported,
@@ -72,22 +58,13 @@ public:
             return false;
 
         const auto& spec = list[index];
-        auto supportedDialects = spec.supportedDialects;
-
-        // MIDI-MPE uses the same raw MIDI channel-voice wire format. Hosts such
-        // as Bitwig have historically gated some controller traffic on this flag,
-        // so a raw-MIDI input can safely advertise it without changing application
-        // event parsing. Output ports remain exactly as declared by the consumer.
-        if (isInput && (supportedDialects & CLAP_NOTE_DIALECT_MIDI) != 0)
-            supportedDialects |= CLAP_NOTE_DIALECT_MIDI_MPE;
-
-        if (spec.id == CLAP_INVALID_ID || supportedDialects == 0
-            || (supportedDialects & spec.preferredDialect) == 0)
+        if (spec.id == CLAP_INVALID_ID || spec.supportedDialects == 0
+            || (spec.supportedDialects & spec.preferredDialect) == 0)
             return false;
 
         out = {};
         out.id = spec.id;
-        out.supported_dialects = supportedDialects;
+        out.supported_dialects = spec.supportedDialects;
         out.preferred_dialect = spec.preferredDialect;
         std::strncpy(out.name, spec.name.c_str(), CLAP_NAME_SIZE - 1);
         out.name[CLAP_NAME_SIZE - 1] = '\0';
