@@ -63,7 +63,8 @@ jobs:
             "NullClapMidiProbe3NihPort.clap",
             "NullClapMidiProbe4AudioInstrument.clap",
             "NullClapMidiProbe5AudioNoteEffect.clap",
-            "NullClapMidiProbe6AllRoles.clap"
+            "NullClapMidiProbe6AllRoles.clap",
+            "NullClapMidiProbe7EventSniffer.clap"
           )
           foreach ($module in $modules) {
             & $validator.FullName validate "build/clap/$module" --only-failed
@@ -96,7 +97,8 @@ jobs:
             NullClapMidiProbe3NihPort.clap \
             NullClapMidiProbe4AudioInstrument.clap \
             NullClapMidiProbe5AudioNoteEffect.clap \
-            NullClapMidiProbe6AllRoles.clap; do
+            NullClapMidiProbe6AllRoles.clap \
+            NullClapMidiProbe7EventSniffer.clap; do
             "$VALIDATOR" validate "build/clap/$module" --only-failed
           done
 
@@ -117,6 +119,7 @@ jobs:
             build/clap/NullClapMidiProbe4AudioInstrument.clap
             build/clap/NullClapMidiProbe5AudioNoteEffect.clap
             build/clap/NullClapMidiProbe6AllRoles.clap
+            build/clap/NullClapMidiProbe7EventSniffer.clap
             examples/MidiRoleProbe/README.md
 
   diagnostic-release:
@@ -161,9 +164,9 @@ jobs:
           cat > release-notes.md <<EOF
           Bitwig MIDI routing diagnostic build from commit ${GITHUB_SHA}.
 
-          This prerelease contains six CLAP probe variants for testing which descriptor/port role combination Bitwig accepts for MIDI delivery to an audio processor. Both Windows and Linux packages come from jobs that passed the null-clap unit tests and clap-validator 0.4.1.
+          This prerelease contains seven CLAP probes. Probes 1-6 test descriptor/port role combinations; Probe 7 is an all-dialect event sniffer that reports any non-parameter CLAP input event. Both Windows and Linux packages come from jobs that passed the null-clap unit tests and clap-validator 0.4.1.
 
-          Use examples/MidiRoleProbe/README.md inside either package for the probe matrix and test procedure.
+          Use examples/MidiRoleProbe/README.md inside either package for the test procedure.
           EOF
 
           gh release create "$TAG" release/* \
