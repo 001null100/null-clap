@@ -13,7 +13,7 @@
 
 namespace nullclap::midi_role_probe
 {
-template <const char* PluginId, const char* PluginName, const char* const* Features>
+template <typename Role>
 class ProbePlugin final : public nullclap::Plugin
 {
 public:
@@ -21,15 +21,15 @@ public:
     {
         static const clap_plugin_descriptor_t value {
             CLAP_VERSION,
-            PluginId,
-            PluginName,
+            Role::id,
+            Role::name,
             "null-clap",
             "https://github.com/001null100/null-clap",
             "",
             "",
             "0.1",
-            "Bitwig CLAP MIDI role-routing probe",
-            Features,
+            "Bitwig CLAP MIDI routing probe",
+            Role::features,
         };
         return value;
     }
@@ -43,7 +43,20 @@ public:
         output.inPlacePair = input.id;
         audioPorts().addInput(std::move(input));
         audioPorts().addOutput(std::move(output));
-        notePorts().addInput(nullclap::NotePortSpec::midi(nullclap::stableId("midi-role-probe.midi.in"), "MIDI Input"));
+
+        notePorts().addInput(nullclap::NotePortSpec::dialects(
+            Role::notePortId,
+            "MIDI Input",
+            Role::supportedDialects,
+            Role::preferredDialect));
+        if constexpr (Role::noteOutput)
+        {
+            notePorts().addOutput(nullclap::NotePortSpec::dialects(
+                Role::notePortId,
+                "MIDI Output",
+                Role::supportedDialects,
+                Role::preferredDialect));
+        }
     }
 
 private:
@@ -78,6 +91,7 @@ private:
         if (header.space_id != CLAP_CORE_EVENT_SPACE_ID || header.type != CLAP_EVENT_MIDI
             || header.size < sizeof(clap_event_midi_t))
             return;
+
         const auto& midi = reinterpret_cast<const clap_event_midi_t&>(header);
         if ((midi.data[0] & 0xF0u) == 0xB0u && midi.data[1] == 20u)
             duck_.store(midi.data[2] >= 64u, std::memory_order_relaxed);
