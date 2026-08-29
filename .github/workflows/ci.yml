@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/bitwig-midi-routing]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -85,6 +85,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          set -euo pipefail
           VALIDATOR="$(find validator -type f -name 'clap-validator' | head -n 1)"
           test -n "$VALIDATOR"
           chmod +x "$VALIDATOR"
@@ -117,6 +118,59 @@ jobs:
             build/clap/NullClapMidiProbe5AudioNoteEffect.clap
             build/clap/NullClapMidiProbe6AllRoles.clap
             examples/MidiRoleProbe/README.md
+
+  diagnostic-release:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/fix/bitwig-midi-routing'
+    needs: build-and-validate
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated MIDI routing probes
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package Bitwig diagnostic builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          test -d artifacts/NullClapMidiRoutingProbes-Windows
+          test -d artifacts/NullClapMidiRoutingProbes-Linux
+          (cd artifacts/NullClapMidiRoutingProbes-Windows && zip -qr ../../release/NullClapMidiRoutingProbes-Windows.zip .)
+          (cd artifacts/NullClapMidiRoutingProbes-Linux && tar -czf ../../release/NullClapMidiRoutingProbes-Linux.tar.gz .)
+
+      - name: Publish Bitwig diagnostic release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="bitwig-midi-routing-diagnostic"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --cleanup-tag --yes
+          fi
+
+          cat > release-notes.md <<EOF
+          Bitwig MIDI routing diagnostic build from commit ${GITHUB_SHA}.
+
+          This prerelease contains six CLAP probe variants for testing which descriptor/port role combination Bitwig accepts for MIDI delivery to an audio processor. Both Windows and Linux packages come from jobs that passed the null-clap unit tests and clap-validator 0.4.1.
+
+          Use examples/MidiRoleProbe/README.md inside either package for the probe matrix and test procedure.
+          EOF
+
+          gh release create "$TAG" release/* \
+            --target "$GITHUB_SHA" \
+            --title "Bitwig MIDI Routing Diagnostic" \
+            --notes-file release-notes.md \
+            --prerelease
 
   release:
     if: >-
