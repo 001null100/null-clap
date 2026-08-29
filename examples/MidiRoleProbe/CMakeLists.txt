@@ -1,7 +1,8 @@
 set(_probe_common ProbePlugin.hpp RoleDefinitions.hpp)
 
-nullclap_add_plugin(NullClapMidiProbeAudioEffect OUTPUT_NAME NullClapMidiProbeAudioEffect SOURCES AudioEffectEntry.cpp ${_probe_common})
-nullclap_add_plugin(NullClapMidiProbeAudioNoteEffect OUTPUT_NAME NullClapMidiProbeAudioNoteEffect SOURCES AudioNoteEffectEntry.cpp ${_probe_common})
-nullclap_add_plugin(NullClapMidiProbeAudioInstrument OUTPUT_NAME NullClapMidiProbeAudioInstrument SOURCES AudioInstrumentEntry.cpp ${_probe_common})
-nullclap_add_plugin(NullClapMidiProbeAllRoles OUTPUT_NAME NullClapMidiProbeAllRoles SOURCES AllRolesEntry.cpp ${_probe_common})
-nullclap_add_plugin(NullClapMidiProbeInstrument OUTPUT_NAME NullClapMidiProbeInstrument SOURCES InstrumentEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe1Current OUTPUT_NAME NullClapMidiProbe1Current SOURCES AudioEffectEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe2ClapPreferred OUTPUT_NAME NullClapMidiProbe2ClapPreferred SOURCES AudioNoteEffectEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe3NihPort OUTPUT_NAME NullClapMidiProbe3NihPort SOURCES InstrumentEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe4AudioInstrument OUTPUT_NAME NullClapMidiProbe4AudioInstrument SOURCES AudioInstrumentEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe5AudioNoteEffect OUTPUT_NAME NullClapMidiProbe5AudioNoteEffect SOURCES NoteEffectEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe6AllRoles OUTPUT_NAME NullClapMidiProbe6AllRoles SOURCES AllRolesEntry.cpp ${_probe_common})
