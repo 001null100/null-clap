@@ -77,6 +77,22 @@ notePorts().addInput(nullclap::NotePortSpec::midi(midiInputId, "MIDI Input"));
 
 The framework describes the port; the consuming plug-in decides what the incoming events mean.
 
+### Host-routing metadata for note-controlled audio effects
+
+Descriptor features are a separate host-facing contract from the note-port extension. A normal stereo audio effect can use:
+
+```cpp
+nullclap::pluginFeatures::stereoAudioEffect.data()
+```
+
+If the plug-in is still an audio processor but relies on the host's note/MIDI signal as a first-class realtime input, explicitly opt into:
+
+```cpp
+nullclap::pluginFeatures::stereoAudioEffectWithNoteInput.data()
+```
+
+That profile advertises both `audio-effect` and `note-effect`, plus `stereo`, so hosts that use descriptor categories when building note-routing topology can see both roles. Do not select it merely because a note port exists for an incidental purpose; null-clap intentionally does not infer descriptor categories from ports.
+
 ## 5. Process spans, not imaginary whole blocks
 
 Implement `processAudio()` under the assumption that a parameter or other input event may have split the host block immediately before `start`. Query `effectiveValue()` inside the span and apply your own smoothing when appropriate.
