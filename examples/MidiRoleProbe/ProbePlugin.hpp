@@ -6,10 +6,15 @@
 #include <nullclap/Parameter.hpp>
 #include <nullclap/Plugin.hpp>
 
+#if defined(_WIN32)
+#include "EventSnifferGui.hpp"
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <clap/events.h>
 #include <cstdint>
+#include <memory>
 #include <utility>
 
 namespace nullclap::midi_role_probe
@@ -28,7 +33,7 @@ public:
             "https://github.com/001null100/null-clap",
             "",
             "",
-            "0.2",
+            "0.3",
             "Bitwig CLAP MIDI routing probe",
             Role::features,
         };
@@ -79,6 +84,13 @@ public:
             type.displayPrecision = 0;
             type.persistent = false;
             parameters().add(std::move(type));
+
+#if defined(_WIN32)
+            // Bitwig does not surface the read-only telemetry parameters in its
+            // generic device view, so Probe 7 owns a tiny native Win32 panel.
+            // The GUI polls only atomics and never touches the audio thread.
+            setGuiDelegate(std::make_unique<EventSnifferGui>(eventCount_, lastEventType_, gain_));
+#endif
         }
 
         auto input = nullclap::AudioPortSpec::stereo(nullclap::stableId("midi-role-probe.audio.in"), "Stereo Input", true);
@@ -158,6 +170,7 @@ private:
                 return;
 
             const auto count = eventCount_.fetch_add(1, std::memory_order_relaxed) + 1;
+            lastEventType_.store(header.type, std::memory_order_relaxed);
             gain_.store(0.5f, std::memory_order_relaxed);
             emitParameterValue(eventCountId,
                                static_cast<double>(std::min<std::uint32_t>(count, 1000000u)),
@@ -193,5 +206,6 @@ private:
 
     std::atomic<float> gain_ { 1.0f };
     std::atomic<std::uint32_t> eventCount_ { 0 };
+    std::atomic<std::uint16_t> lastEventType_ { 0xFFFFu };
 };
 } // namespace nullclap::midi_role_probe
