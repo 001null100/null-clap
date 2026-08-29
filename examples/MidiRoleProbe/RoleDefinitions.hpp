@@ -118,4 +118,40 @@ struct EventSnifferRole
     static constexpr bool noteOutput = true;
     static constexpr bool sniffAllEvents = true;
 };
+
+struct Midi1OnlySnifferRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.event-sniffer-midi1-only-v1";
+    inline static constexpr char name[] = "NullClap MIDI Probe 8 - MIDI1 Only";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_INSTRUMENT,
+        CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_MIDI;
+    static constexpr bool noteOutput = true;
+    static constexpr bool sniffAllEvents = true;
+};
+
+struct MidiMpeOnlySnifferRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.event-sniffer-midi-mpe-only-v1";
+    inline static constexpr char name[] = "NullClap MIDI Probe 9 - MIDI-MPE Only";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_INSTRUMENT,
+        CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI_MPE;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_MIDI_MPE;
+    static constexpr bool noteOutput = true;
+    static constexpr bool sniffAllEvents = true;
+};
 } // namespace nullclap::midi_role_probe

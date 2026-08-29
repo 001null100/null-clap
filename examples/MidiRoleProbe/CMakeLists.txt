@@ -7,7 +7,11 @@ nullclap_add_plugin(NullClapMidiProbe4AudioInstrument OUTPUT_NAME NullClapMidiPr
 nullclap_add_plugin(NullClapMidiProbe5AudioNoteEffect OUTPUT_NAME NullClapMidiProbe5AudioNoteEffect SOURCES NoteEffectEntry.cpp ${_probe_common})
 nullclap_add_plugin(NullClapMidiProbe6AllRoles OUTPUT_NAME NullClapMidiProbe6AllRoles SOURCES AllRolesEntry.cpp ${_probe_common})
 nullclap_add_plugin(NullClapMidiProbe7EventSniffer OUTPUT_NAME NullClapMidiProbe7EventSniffer SOURCES EventSnifferEntry.cpp EventSnifferGui.hpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe8Midi1Only OUTPUT_NAME NullClapMidiProbe8Midi1Only SOURCES Midi1OnlyEntry.cpp EventSnifferGui.hpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe9MidiMpeOnly OUTPUT_NAME NullClapMidiProbe9MidiMpeOnly SOURCES MidiMpeOnlyEntry.cpp EventSnifferGui.hpp ${_probe_common})
 
 if(WIN32)
-    target_link_libraries(NullClapMidiProbe7EventSniffer PRIVATE user32 gdi32)
+    foreach(target NullClapMidiProbe1Current NullClapMidiProbe2ClapPreferred NullClapMidiProbe3NihPort NullClapMidiProbe4AudioInstrument NullClapMidiProbe5AudioNoteEffect NullClapMidiProbe6AllRoles NullClapMidiProbe7EventSniffer NullClapMidiProbe8Midi1Only NullClapMidiProbe9MidiMpeOnly)
+        target_link_libraries(${target} PRIVATE user32 gdi32)
+    endforeach()
 endif()
