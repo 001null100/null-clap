@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/bitwig-midi-routing]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -50,14 +50,22 @@ jobs:
           $validator = Get-ChildItem validator -Filter "clap-validator.exe" -Recurse | Select-Object -First 1
           if (-not $validator) { throw "clap-validator.exe not found in release archive" }
 
-      - name: Validate example (Windows)
+      - name: Validate examples and MIDI routing probes (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $validator = Get-ChildItem validator -Filter "clap-validator.exe" -Recurse | Select-Object -First 1
           if (-not $validator) { throw "clap-validator.exe not found" }
-          & $validator.FullName validate "build/clap/NullClapMinimalEffect.clap" --only-failed
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $modules = @("NullClapMinimalEffect.clap") + @(
+            Get-ChildItem build/clap -Filter "NullClapMidiProbe*.clap" |
+              Sort-Object Name |
+              ForEach-Object { $_.Name }
+          )
+          if ($modules.Count -lt 10) { throw "Expected MinimalEffect plus nine MIDI probes" }
+          foreach ($module in $modules) {
+            & $validator.FullName validate "build/clap/$module" --only-failed
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Download clap-validator (Linux)
         if: runner.os == 'Linux'
@@ -70,20 +78,87 @@ jobs:
           mkdir -p validator
           tar -xzf "$ARCHIVE" -C validator
 
-      - name: Validate example (Linux)
+      - name: Validate examples and MIDI routing probes (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          set -euo pipefail
           VALIDATOR="$(find validator -type f -name 'clap-validator' | head -n 1)"
           test -n "$VALIDATOR"
           chmod +x "$VALIDATOR"
+          mapfile -t PROBES < <(find build/clap -maxdepth 1 -type f -name 'NullClapMidiProbe*.clap' -printf '%f\n' | sort)
+          test "${#PROBES[@]}" -eq 9
           "$VALIDATOR" validate "build/clap/NullClapMinimalEffect.clap" --only-failed
+          for module in "${PROBES[@]}"; do
+            "$VALIDATOR" validate "build/clap/$module" --only-failed
+          done
 
       - name: Upload example
         uses: actions/upload-artifact@v4
         with:
           name: NullClapMinimalEffect-${{ runner.os }}
           path: build/clap/NullClapMinimalEffect.clap
+
+      - name: Upload Bitwig MIDI routing probes
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullClapMidiRoutingProbes-${{ runner.os }}
+          path: |
+            build/clap/NullClapMidiProbe*.clap
+            examples/MidiRoleProbe/README.md
+
+  diagnostic-release:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/fix/bitwig-midi-routing'
+    needs: build-and-validate
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated MIDI routing probes
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package Bitwig diagnostic builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          test -d artifacts/NullClapMidiRoutingProbes-Windows
+          test -d artifacts/NullClapMidiRoutingProbes-Linux
+          (cd artifacts/NullClapMidiRoutingProbes-Windows && zip -qr ../../release/NullClapMidiRoutingProbes-Windows.zip .)
+          (cd artifacts/NullClapMidiRoutingProbes-Linux && tar -czf ../../release/NullClapMidiRoutingProbes-Linux.tar.gz .)
+
+      - name: Publish Bitwig diagnostic release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="bitwig-midi-routing-diagnostic"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --cleanup-tag --yes
+          fi
+
+          cat > release-notes.md <<EOF
+          Bitwig MIDI routing diagnostic build from commit ${GITHUB_SHA}.
+
+          This prerelease contains nine CLAP probes. Probes 1-6 test descriptor/port role combinations; Probe 7 is the broad event sniffer; Probes 8-9 force MIDI1-only and MIDI-MPE-only note-port dialects to isolate Bitwig's controller-event negotiation. Both Windows and Linux packages come from jobs that passed the null-clap unit tests and clap-validator 0.4.1.
+
+          Use examples/MidiRoleProbe/README.md inside either package for the test procedure.
+          EOF
+
+          gh release create "$TAG" release/* \
+            --target "$GITHUB_SHA" \
+            --title "Bitwig MIDI Routing Diagnostic" \
+            --notes-file release-notes.md \
+            --prerelease
 
   release:
     if: >-

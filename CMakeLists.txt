@@ -47,6 +47,7 @@ include(cmake/NullClapPlugin.cmake)
 
 if(NULLCLAP_BUILD_EXAMPLES)
     add_subdirectory(examples/MinimalEffect)
+    add_subdirectory(examples/MidiRoleProbe)
 endif()
 
 if(NULLCLAP_BUILD_TESTS)
@@ -61,4 +62,9 @@ if(NULLCLAP_BUILD_TESTS)
     target_link_libraries(nullclap_gui_sizing_tests PRIVATE nullclap::nullclap)
     target_compile_features(nullclap_gui_sizing_tests PRIVATE cxx_std_20)
     add_test(NAME nullclap_gui_sizing COMMAND nullclap_gui_sizing_tests)
+
+    add_executable(nullclap_midi_input_tests tests/MidiInputTests.cpp)
+    target_link_libraries(nullclap_midi_input_tests PRIVATE nullclap::nullclap)
+    target_compile_features(nullclap_midi_input_tests PRIVATE cxx_std_20)
+    add_test(NAME nullclap_midi_input COMMAND nullclap_midi_input_tests)
 endif()

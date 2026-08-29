@@ -77,6 +77,24 @@ notePorts().addInput(nullclap::NotePortSpec::midi(midiInputId, "MIDI Input"));
 
 The framework describes the port; the consuming plug-in decides what the incoming events mean.
 
+### Descriptor roles for MIDI-controlled audio effects
+
+Descriptor features are a separate host-facing contract from note ports. A conventional stereo audio effect can use:
+
+```cpp
+nullclap::pluginFeatures::stereoAudioEffect.data()
+```
+
+If the processor has a normal audio input/output path but its output is also driven by incoming note or MIDI events, use:
+
+```cpp
+nullclap::pluginFeatures::stereoMidiControlledAudioEffect.data()
+```
+
+That profile advertises `audio-effect`, `instrument`, and `stereo`. CLAP defines `instrument` as a plug-in which processes note events and produces audio, which covers MIDI-triggered gates, glitch processors, vocoders, and similar hybrid audio processors.
+
+Do not use `note-effect` merely because a note port exists. CLAP reserves that role for plug-ins which process or generate note events. If an application also emits notes, it can add `CLAP_PLUGIN_FEATURE_NOTE_EFFECT` explicitly.
+
 ## 5. Process spans, not imaginary whole blocks
 
 Implement `processAudio()` under the assumption that a parameter or other input event may have split the host block immediately before `start`. Query `effectiveValue()` inside the span and apply your own smoothing when appropriate.
