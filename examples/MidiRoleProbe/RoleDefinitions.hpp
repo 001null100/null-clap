@@ -99,4 +99,23 @@ struct AllRolesNihRole
     static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
     static constexpr bool noteOutput = true;
 };
+
+struct EventSnifferRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.event-sniffer-v1";
+    inline static constexpr char name[] = "NullClap MIDI Probe 7 - Event Sniffer";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_INSTRUMENT,
+        CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects =
+        CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI2;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = true;
+    static constexpr bool sniffAllEvents = true;
+};
 } // namespace nullclap::midi_role_probe
