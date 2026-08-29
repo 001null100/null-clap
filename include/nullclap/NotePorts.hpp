@@ -26,6 +26,23 @@ struct NotePortSpec
         return result;
     }
 
+    // Controller-oriented input for hosts that gate channel-voice controller
+    // traffic on MIDI-MPE capability. The wire format remains ordinary raw MIDI;
+    // advertising MIDI_MPE simply tells the host that channelized MIDI controller
+    // traffic is safe to deliver. CLAP note events are accepted as well so hosts
+    // remain free to use their preferred representation for note on/off traffic.
+    static NotePortSpec controllerInput(clap_id id, std::string name)
+    {
+        NotePortSpec result;
+        result.id = id;
+        result.name = std::move(name);
+        result.supportedDialects = CLAP_NOTE_DIALECT_MIDI
+            | CLAP_NOTE_DIALECT_MIDI_MPE
+            | CLAP_NOTE_DIALECT_CLAP;
+        result.preferredDialect = CLAP_NOTE_DIALECT_MIDI;
+        return result;
+    }
+
     static NotePortSpec dialects(clap_id id,
                                  std::string name,
                                  std::uint32_t supported,
