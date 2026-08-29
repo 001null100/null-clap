@@ -1,10 +1,15 @@
 #pragma once
 
+#include <nullclap/AudioPorts.hpp>
+#include <nullclap/Id.hpp>
+#include <nullclap/NotePorts.hpp>
 #include <nullclap/Plugin.hpp>
 
-#include <array>
+#include <algorithm>
 #include <atomic>
+#include <clap/events.h>
 #include <cstdint>
+#include <utility>
 
 namespace nullclap::midi_role_probe
 {
