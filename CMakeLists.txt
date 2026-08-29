@@ -47,6 +47,7 @@ include(cmake/NullClapPlugin.cmake)
 
 if(NULLCLAP_BUILD_EXAMPLES)
     add_subdirectory(examples/MinimalEffect)
+    add_subdirectory(examples/MidiRoleProbe)
 endif()
 
 if(NULLCLAP_BUILD_TESTS)
