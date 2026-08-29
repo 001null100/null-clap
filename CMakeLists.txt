@@ -51,8 +51,14 @@ endif()
 
 if(NULLCLAP_BUILD_TESTS)
     enable_testing()
+
     add_executable(nullclap_tests tests/ParameterStoreTests.cpp)
     target_link_libraries(nullclap_tests PRIVATE nullclap::nullclap)
     target_compile_features(nullclap_tests PRIVATE cxx_std_20)
     add_test(NAME nullclap_parameter_store COMMAND nullclap_tests)
+
+    add_executable(nullclap_gui_sizing_tests tests/GuiSizingTests.cpp)
+    target_link_libraries(nullclap_gui_sizing_tests PRIVATE nullclap::nullclap)
+    target_compile_features(nullclap_gui_sizing_tests PRIVATE cxx_std_20)
+    add_test(NAME nullclap_gui_sizing COMMAND nullclap_gui_sizing_tests)
 endif()
