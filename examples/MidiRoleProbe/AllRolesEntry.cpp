@@ -1,5 +1,5 @@
 #include "ProbePlugin.hpp"
 #include "RoleDefinitions.hpp"
 #include <nullclap/Entry.hpp>
-using Probe = nullclap::midi_role_probe::ProbePlugin<nullclap::midi_role_probe::allRolesId, nullclap::midi_role_probe::allRolesName, nullclap::midi_role_probe::allRolesFeatures>;
+using Probe = nullclap::midi_role_probe::ProbePlugin<nullclap::midi_role_probe::AllRolesNihRole>;
 NULLCLAP_DEFINE_ENTRY(Probe);
