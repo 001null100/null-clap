@@ -26,19 +26,16 @@ struct NotePortSpec
         return result;
     }
 
-    // Controller-oriented input for hosts that gate channel-voice controller
-    // traffic on MIDI-MPE capability. The wire format remains ordinary raw MIDI;
-    // advertising MIDI_MPE simply tells the host that channelized MIDI controller
-    // traffic is safe to deliver. CLAP note events are accepted as well so hosts
-    // remain free to use their preferred representation for note on/off traffic.
+    // Controller-oriented input for applications that also accept native CLAP
+    // note events. Raw-MIDI input ports are normalized to advertise MIDI_MPE in
+    // NotePorts::info(), so callers do not need to opt into that compatibility
+    // flag individually.
     static NotePortSpec controllerInput(clap_id id, std::string name)
     {
         NotePortSpec result;
         result.id = id;
         result.name = std::move(name);
-        result.supportedDialects = CLAP_NOTE_DIALECT_MIDI
-            | CLAP_NOTE_DIALECT_MIDI_MPE
-            | CLAP_NOTE_DIALECT_CLAP;
+        result.supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
         result.preferredDialect = CLAP_NOTE_DIALECT_MIDI;
         return result;
     }
@@ -75,13 +72,22 @@ public:
             return false;
 
         const auto& spec = list[index];
-        if (spec.id == CLAP_INVALID_ID || spec.supportedDialects == 0
-            || (spec.supportedDialects & spec.preferredDialect) == 0)
+        auto supportedDialects = spec.supportedDialects;
+
+        // MIDI-MPE uses the same raw MIDI channel-voice wire format. Hosts such
+        // as Bitwig have historically gated some controller traffic on this flag,
+        // so a raw-MIDI input can safely advertise it without changing application
+        // event parsing. Output ports remain exactly as declared by the consumer.
+        if (isInput && (supportedDialects & CLAP_NOTE_DIALECT_MIDI) != 0)
+            supportedDialects |= CLAP_NOTE_DIALECT_MIDI_MPE;
+
+        if (spec.id == CLAP_INVALID_ID || supportedDialects == 0
+            || (supportedDialects & spec.preferredDialect) == 0)
             return false;
 
         out = {};
         out.id = spec.id;
-        out.supported_dialects = spec.supportedDialects;
+        out.supported_dialects = supportedDialects;
         out.preferred_dialect = spec.preferredDialect;
         std::strncpy(out.name, spec.name.c_str(), CLAP_NAME_SIZE - 1);
         out.name[CLAP_NAME_SIZE - 1] = '\0';
