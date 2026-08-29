@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <clap/events.h>
+#include <clap/ext/note-ports.h>
 #include <clap/host.h>
 #include <clap/plugin.h>
 #include <cstdint>
@@ -90,7 +91,7 @@ public:
         : Plugin(&descriptor(), host)
     {
         lastInstance = this;
-        notePorts().addInput(nullclap::NotePortSpec::midi(
+        notePorts().addInput(nullclap::NotePortSpec::controllerInput(
             nullclap::stableId("tests-midi-probe.input"), "MIDI Input"));
     }
 
@@ -142,6 +143,18 @@ int main()
     assert(instance != nullptr);
 
     assert(plugin->init(plugin));
+
+    const auto* notePorts = static_cast<const clap_plugin_note_ports_t*>(
+        plugin->get_extension(plugin, CLAP_EXT_NOTE_PORTS));
+    assert(notePorts != nullptr);
+    assert(notePorts->count(plugin, true) == 1);
+    clap_note_port_info_t inputInfo {};
+    assert(notePorts->get(plugin, 0, true, &inputInfo));
+    assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_MIDI) != 0);
+    assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_MIDI_MPE) != 0);
+    assert((inputInfo.supported_dialects & CLAP_NOTE_DIALECT_CLAP) != 0);
+    assert(inputInfo.preferred_dialect == CLAP_NOTE_DIALECT_MIDI);
+
     assert(plugin->activate(plugin, 48000.0, 1, 64));
     assert(plugin->start_processing(plugin));
 
