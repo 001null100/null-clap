@@ -50,7 +50,7 @@ jobs:
           $validator = Get-ChildItem validator -Filter "clap-validator.exe" -Recurse | Select-Object -First 1
           if (-not $validator) { throw "clap-validator.exe not found in release archive" }
 
-      - name: Validate examples and MIDI role probes (Windows)
+      - name: Validate examples and MIDI routing probes (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -58,11 +58,12 @@ jobs:
           if (-not $validator) { throw "clap-validator.exe not found" }
           $modules = @(
             "NullClapMinimalEffect.clap",
-            "NullClapMidiProbeAudioEffect.clap",
-            "NullClapMidiProbeAudioNoteEffect.clap",
-            "NullClapMidiProbeAudioInstrument.clap",
-            "NullClapMidiProbeAllRoles.clap",
-            "NullClapMidiProbeInstrument.clap"
+            "NullClapMidiProbe1Current.clap",
+            "NullClapMidiProbe2ClapPreferred.clap",
+            "NullClapMidiProbe3NihPort.clap",
+            "NullClapMidiProbe4AudioInstrument.clap",
+            "NullClapMidiProbe5AudioNoteEffect.clap",
+            "NullClapMidiProbe6AllRoles.clap"
           )
           foreach ($module in $modules) {
             & $validator.FullName validate "build/clap/$module" --only-failed
@@ -80,7 +81,7 @@ jobs:
           mkdir -p validator
           tar -xzf "$ARCHIVE" -C validator
 
-      - name: Validate examples and MIDI role probes (Linux)
+      - name: Validate examples and MIDI routing probes (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -89,11 +90,12 @@ jobs:
           chmod +x "$VALIDATOR"
           for module in \
             NullClapMinimalEffect.clap \
-            NullClapMidiProbeAudioEffect.clap \
-            NullClapMidiProbeAudioNoteEffect.clap \
-            NullClapMidiProbeAudioInstrument.clap \
-            NullClapMidiProbeAllRoles.clap \
-            NullClapMidiProbeInstrument.clap; do
+            NullClapMidiProbe1Current.clap \
+            NullClapMidiProbe2ClapPreferred.clap \
+            NullClapMidiProbe3NihPort.clap \
+            NullClapMidiProbe4AudioInstrument.clap \
+            NullClapMidiProbe5AudioNoteEffect.clap \
+            NullClapMidiProbe6AllRoles.clap; do
             "$VALIDATOR" validate "build/clap/$module" --only-failed
           done
 
@@ -103,16 +105,17 @@ jobs:
           name: NullClapMinimalEffect-${{ runner.os }}
           path: build/clap/NullClapMinimalEffect.clap
 
-      - name: Upload Bitwig MIDI role probes
+      - name: Upload Bitwig MIDI routing probes
         uses: actions/upload-artifact@v4
         with:
-          name: NullClapMidiRoleProbes-${{ runner.os }}
+          name: NullClapMidiRoutingProbes-${{ runner.os }}
           path: |
-            build/clap/NullClapMidiProbeAudioEffect.clap
-            build/clap/NullClapMidiProbeAudioNoteEffect.clap
-            build/clap/NullClapMidiProbeAudioInstrument.clap
-            build/clap/NullClapMidiProbeAllRoles.clap
-            build/clap/NullClapMidiProbeInstrument.clap
+            build/clap/NullClapMidiProbe1Current.clap
+            build/clap/NullClapMidiProbe2ClapPreferred.clap
+            build/clap/NullClapMidiProbe3NihPort.clap
+            build/clap/NullClapMidiProbe4AudioInstrument.clap
+            build/clap/NullClapMidiProbe5AudioNoteEffect.clap
+            build/clap/NullClapMidiProbe6AllRoles.clap
             examples/MidiRoleProbe/README.md
 
   release:
