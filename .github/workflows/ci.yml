@@ -50,14 +50,24 @@ jobs:
           $validator = Get-ChildItem validator -Filter "clap-validator.exe" -Recurse | Select-Object -First 1
           if (-not $validator) { throw "clap-validator.exe not found in release archive" }
 
-      - name: Validate example (Windows)
+      - name: Validate examples and MIDI role probes (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $validator = Get-ChildItem validator -Filter "clap-validator.exe" -Recurse | Select-Object -First 1
           if (-not $validator) { throw "clap-validator.exe not found" }
-          & $validator.FullName validate "build/clap/NullClapMinimalEffect.clap" --only-failed
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $modules = @(
+            "NullClapMinimalEffect.clap",
+            "NullClapMidiProbeAudioEffect.clap",
+            "NullClapMidiProbeAudioNoteEffect.clap",
+            "NullClapMidiProbeAudioInstrument.clap",
+            "NullClapMidiProbeAllRoles.clap",
+            "NullClapMidiProbeInstrument.clap"
+          )
+          foreach ($module in $modules) {
+            & $validator.FullName validate "build/clap/$module" --only-failed
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Download clap-validator (Linux)
         if: runner.os == 'Linux'
@@ -70,20 +80,40 @@ jobs:
           mkdir -p validator
           tar -xzf "$ARCHIVE" -C validator
 
-      - name: Validate example (Linux)
+      - name: Validate examples and MIDI role probes (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           VALIDATOR="$(find validator -type f -name 'clap-validator' | head -n 1)"
           test -n "$VALIDATOR"
           chmod +x "$VALIDATOR"
-          "$VALIDATOR" validate "build/clap/NullClapMinimalEffect.clap" --only-failed
+          for module in \
+            NullClapMinimalEffect.clap \
+            NullClapMidiProbeAudioEffect.clap \
+            NullClapMidiProbeAudioNoteEffect.clap \
+            NullClapMidiProbeAudioInstrument.clap \
+            NullClapMidiProbeAllRoles.clap \
+            NullClapMidiProbeInstrument.clap; do
+            "$VALIDATOR" validate "build/clap/$module" --only-failed
+          done
 
       - name: Upload example
         uses: actions/upload-artifact@v4
         with:
           name: NullClapMinimalEffect-${{ runner.os }}
           path: build/clap/NullClapMinimalEffect.clap
+
+      - name: Upload Bitwig MIDI role probes
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullClapMidiRoleProbes-${{ runner.os }}
+          path: |
+            build/clap/NullClapMidiProbeAudioEffect.clap
+            build/clap/NullClapMidiProbeAudioNoteEffect.clap
+            build/clap/NullClapMidiProbeAudioInstrument.clap
+            build/clap/NullClapMidiProbeAllRoles.clap
+            build/clap/NullClapMidiProbeInstrument.clap
+            examples/MidiRoleProbe/README.md
 
   release:
     if: >-
