@@ -6,3 +6,4 @@ nullclap_add_plugin(NullClapMidiProbe3NihPort OUTPUT_NAME NullClapMidiProbe3NihP
 nullclap_add_plugin(NullClapMidiProbe4AudioInstrument OUTPUT_NAME NullClapMidiProbe4AudioInstrument SOURCES AudioInstrumentEntry.cpp ${_probe_common})
 nullclap_add_plugin(NullClapMidiProbe5AudioNoteEffect OUTPUT_NAME NullClapMidiProbe5AudioNoteEffect SOURCES NoteEffectEntry.cpp ${_probe_common})
 nullclap_add_plugin(NullClapMidiProbe6AllRoles OUTPUT_NAME NullClapMidiProbe6AllRoles SOURCES AllRolesEntry.cpp ${_probe_common})
+nullclap_add_plugin(NullClapMidiProbe7EventSniffer OUTPUT_NAME NullClapMidiProbe7EventSniffer SOURCES EventSnifferEntry.cpp ${_probe_common})
