@@ -3,6 +3,7 @@
 #include <nullclap/AudioPorts.hpp>
 #include <nullclap/Id.hpp>
 #include <nullclap/NotePorts.hpp>
+#include <nullclap/Parameter.hpp>
 #include <nullclap/Plugin.hpp>
 
 #include <algorithm>
@@ -37,6 +38,22 @@ public:
     explicit ProbePlugin(const clap_host_t* host)
         : Plugin(&descriptor(), host)
     {
+        // clap-validator 0.4.1's param-conversions test crashes on plug-ins that
+        // implement CLAP_EXT_PARAMS while exposing zero parameters. null-clap's
+        // Plugin base intentionally implements the extension for every plug-in,
+        // so keep one inert hidden parameter in these diagnostic-only probes.
+        // It has no effect on MIDI routing or audio processing.
+        auto sentinel = nullclap::ParameterSpec::continuous(
+            nullclap::stableId("midi-role-probe.diagnostic-sentinel"),
+            "Diagnostic Sentinel",
+            "Diagnostics",
+            0.0,
+            1.0,
+            0.0,
+            CLAP_PARAM_IS_HIDDEN);
+        sentinel.persistent = false;
+        parameters().add(std::move(sentinel));
+
         auto input = nullclap::AudioPortSpec::stereo(nullclap::stableId("midi-role-probe.audio.in"), "Stereo Input", true);
         auto output = nullclap::AudioPortSpec::stereo(nullclap::stableId("midi-role-probe.audio.out"), "Stereo Output", true);
         input.inPlacePair = output.id;
