@@ -1,47 +1,102 @@
 #pragma once
 
 #include <clap/plugin-features.h>
+#include <clap/ext/note-ports.h>
+#include <cstdint>
 
 namespace nullclap::midi_role_probe
 {
-inline constexpr char audioEffectId[] = "dev.nullclap.midi-role-probe.audio-effect";
-inline constexpr char audioEffectName[] = "NullClap MIDI Probe - Audio Effect";
-inline constexpr char audioNoteEffectId[] = "dev.nullclap.midi-role-probe.audio-note-effect";
-inline constexpr char audioNoteEffectName[] = "NullClap MIDI Probe - Audio+Note Effect";
-inline constexpr char audioInstrumentId[] = "dev.nullclap.midi-role-probe.audio-instrument";
-inline constexpr char audioInstrumentName[] = "NullClap MIDI Probe - Audio+Instrument";
-inline constexpr char allRolesId[] = "dev.nullclap.midi-role-probe.all-roles";
-inline constexpr char allRolesName[] = "NullClap MIDI Probe - All Roles";
-inline constexpr char instrumentId[] = "dev.nullclap.midi-role-probe.instrument";
-inline constexpr char instrumentName[] = "NullClap MIDI Probe - Instrument";
+struct AudioEffectCurrentRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.audio-current";
+    inline static constexpr char name[] = "NullClap MIDI Probe 1 - Current";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0x4E434D49u;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_MIDI;
+    static constexpr bool noteOutput = false;
+};
 
-inline constexpr const char* audioEffectFeatures[] {
-    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    nullptr,
+struct AudioEffectClapPreferredRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.audio-clap-preferred";
+    inline static constexpr char name[] = "NullClap MIDI Probe 2 - CLAP Preferred";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0x4E434D49u;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = false;
 };
-inline constexpr const char* audioNoteEffectFeatures[] {
-    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    nullptr,
+
+struct AudioEffectNihPortRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.audio-nih-port";
+    inline static constexpr char name[] = "NullClap MIDI Probe 3 - NIH Port";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = false;
 };
-inline constexpr const char* audioInstrumentFeatures[] {
-    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_INSTRUMENT,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    nullptr,
+
+struct AudioInstrumentNihRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.audio-instrument-nih";
+    inline static constexpr char name[] = "NullClap MIDI Probe 4 - Audio+Instrument";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_INSTRUMENT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = false;
 };
-inline constexpr const char* allRolesFeatures[] {
-    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_INSTRUMENT,
-    CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    nullptr,
+
+struct AudioNoteEffectNihRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.audio-note-effect-nih";
+    inline static constexpr char name[] = "NullClap MIDI Probe 5 - Audio+Note Effect";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = true;
 };
-inline constexpr const char* instrumentFeatures[] {
-    CLAP_PLUGIN_FEATURE_INSTRUMENT,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    nullptr,
+
+struct AllRolesNihRole
+{
+    inline static constexpr char id[] = "dev.nullclap.midi-probe.all-roles-nih";
+    inline static constexpr char name[] = "NullClap MIDI Probe 6 - All Roles";
+    inline static constexpr const char* features[] {
+        CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+        CLAP_PLUGIN_FEATURE_INSTRUMENT,
+        CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+        CLAP_PLUGIN_FEATURE_STEREO,
+        nullptr,
+    };
+    static constexpr clap_id notePortId = 0;
+    static constexpr std::uint32_t supportedDialects = CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_CLAP;
+    static constexpr std::uint32_t preferredDialect = CLAP_NOTE_DIALECT_CLAP;
+    static constexpr bool noteOutput = true;
 };
 } // namespace nullclap::midi_role_probe
