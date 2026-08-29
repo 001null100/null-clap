@@ -51,7 +51,7 @@ Provides checked C++ glue for CLAP callbacks and host extension access. Debug bu
 - a fixed-capacity GUI-to-host parameter event queue
 - sample-offset segmentation of `process()`
 
-`PluginFeatures.hpp` additionally provides explicit descriptor feature profiles. These are discovery/routing metadata, not runtime behavior. They are opt-in because a plug-in having a note port does not by itself make that plug-in a CLAP note effect.
+`PluginFeatures.hpp` additionally provides explicit descriptor feature profiles. These are host-facing discovery/classification metadata, not runtime behavior. They remain explicit rather than being inferred from ports because a note port alone does not determine a plug-in's role.
 
 ### Application plug-in
 
@@ -63,9 +63,15 @@ Subclass `nullclap::Plugin`, register parameters/audio ports/note ports/pages in
 
 A conventional stereo audio processor can use `nullclap::pluginFeatures::stereoAudioEffect`.
 
-For a processor that remains fundamentally an audio effect but also consumes the host's note/MIDI signal as first-class realtime input, `nullclap::pluginFeatures::stereoAudioEffectWithNoteInput` advertises both `audio-effect` and `note-effect`, plus `stereo`.
+A MIDI- or note-controlled processor with a normal audio input/output path can use `nullclap::pluginFeatures::stereoMidiControlledAudioEffect`. That profile advertises:
 
-This hybrid profile is intentionally explicit. Some hosts use descriptor categories when constructing their device/note routing topology independently of the `CLAP_EXT_NOTE_PORTS` declaration. A consuming plug-in should choose the hybrid profile only when it genuinely needs host note/MIDI routing while operating as an audio processor. null-clap does not infer descriptor categories from note ports.
+- `audio-effect`
+- `instrument`
+- `stereo`
+
+This follows CLAP's role definitions directly: `instrument` describes a plug-in which processes note events and produces audio, while `note-effect` is for plug-ins which process or generate note events. A MIDI-triggered audio effect therefore does not need to pretend to be a note effect unless it also exposes a genuine note-processing/output role.
+
+Descriptor features and `CLAP_EXT_NOTE_PORTS` are complementary. The descriptor tells the host what kind of device it is; note ports tell the host which event endpoints and dialects the instance exposes. null-clap does not rewrite descriptor categories at factory time and does not silently widen note dialects.
 
 ## Process timeline
 
@@ -82,7 +88,7 @@ For a block with events at samples 117 and 305:
 
 `processAudio(process, start, end)` therefore sees parameter state that is valid for exactly that span.
 
-Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed. `tests/MidiInputTests.cpp` exercises that contract with a raw channel-16 CC event through a real `clap_process_t` event list.
+Non-parameter events, including raw MIDI events received through a note port, are forwarded through `onEvent()` at their original CLAP event time after the preceding audio span has been processed. `tests/MidiInputTests.cpp` models a stereo audio-input/output processor with the MIDI-controlled audio-effect role profile and verifies a raw channel-16 CC through a real `clap_process_t` event list.
 
 Event handlers that need block-level information such as the initial transport structure may call the protected `currentProcess()` accessor. It returns the host's raw `clap_process_t` only while the current `process()` call is active. null-clap deliberately does not wrap that transport/process context in a parallel abstraction.
 
