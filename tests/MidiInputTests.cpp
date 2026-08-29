@@ -1,3 +1,4 @@
+#include <nullclap/Factory.hpp>
 #include <nullclap/Id.hpp>
 #include <nullclap/NotePorts.hpp>
 #include <nullclap/Plugin.hpp>
@@ -33,6 +34,16 @@ clap_host_t makeHost()
     };
 }
 
+bool descriptorHasFeature(const clap_plugin_descriptor_t& descriptor, const char* feature)
+{
+    if (descriptor.features == nullptr)
+        return false;
+    for (const auto* const* current = descriptor.features; *current != nullptr; ++current)
+        if (std::strcmp(*current, feature) == 0)
+            return true;
+    return false;
+}
+
 struct OneEventList
 {
     clap_input_events_t interface {};
@@ -54,8 +65,12 @@ struct OneEventList
 class MidiProbePlugin final : public nullclap::Plugin
 {
 public:
+    static inline MidiProbePlugin* lastInstance = nullptr;
+
     static const clap_plugin_descriptor_t& descriptor() noexcept
     {
+        // Deliberately start as a plain audio effect. The target-level null-clap
+        // routing opt-in must augment this descriptor at the factory boundary.
         static const clap_plugin_descriptor_t value {
             CLAP_VERSION,
             "dev.nullclap.tests-midi-probe",
@@ -66,7 +81,7 @@ public:
             "",
             "0.1",
             "Framework raw MIDI delivery probe",
-            nullclap::pluginFeatures::stereoAudioEffectWithNoteInput.data(),
+            nullclap::pluginFeatures::stereoAudioEffect.data(),
         };
         return value;
     }
@@ -74,8 +89,15 @@ public:
     explicit MidiProbePlugin(const clap_host_t* host)
         : Plugin(&descriptor(), host)
     {
+        lastInstance = this;
         notePorts().addInput(nullclap::NotePortSpec::midi(
             nullclap::stableId("tests-midi-probe.input"), "MIDI Input"));
+    }
+
+    ~MidiProbePlugin() override
+    {
+        if (lastInstance == this)
+            lastInstance = nullptr;
     }
 
     int midiEvents = 0;
@@ -103,16 +125,21 @@ private:
 
 int main()
 {
-    // The hybrid profile deliberately retains audio-effect identity while exposing
-    // the host-facing note-effect category used by hosts when constructing note routes.
-    assert(std::strcmp(nullclap::pluginFeatures::stereoAudioEffectWithNoteInput[0],
-                       CLAP_PLUGIN_FEATURE_AUDIO_EFFECT) == 0);
-    assert(std::strcmp(nullclap::pluginFeatures::stereoAudioEffectWithNoteInput[1],
-                       CLAP_PLUGIN_FEATURE_NOTE_EFFECT) == 0);
-
     auto host = makeHost();
-    auto* instance = new MidiProbePlugin(&host);
-    const auto* plugin = instance->clapPlugin();
+    const auto* factory = nullclap::SinglePluginFactory<MidiProbePlugin>::get();
+    assert(factory->get_plugin_count(factory) == 1);
+
+    const auto* descriptor = factory->get_plugin_descriptor(factory, 0);
+    assert(descriptor != nullptr);
+    assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_AUDIO_EFFECT));
+    assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_STEREO));
+    assert(descriptorHasFeature(*descriptor, CLAP_PLUGIN_FEATURE_NOTE_EFFECT));
+
+    const auto* plugin = factory->create_plugin(factory, &host, descriptor->id);
+    assert(plugin != nullptr);
+    assert(plugin->desc == descriptor);
+    auto* instance = MidiProbePlugin::lastInstance;
+    assert(instance != nullptr);
 
     assert(plugin->init(plugin));
     assert(plugin->activate(plugin, 48000.0, 1, 64));
@@ -143,5 +170,6 @@ int main()
     plugin->stop_processing(plugin);
     plugin->deactivate(plugin);
     plugin->destroy(plugin);
+    assert(MidiProbePlugin::lastInstance == nullptr);
     return 0;
 }
