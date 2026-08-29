@@ -45,13 +45,3 @@ function(nullclap_add_plugin target)
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endfunction()
-
-# Opt-in host-routing compatibility profile for an audio effect that also needs
-# the host's note/MIDI stream as a first-class realtime input. The factory keeps
-# the plug-in's existing descriptor features and adds CLAP note-effect metadata.
-function(nullclap_enable_note_input_routing target)
-    if(NOT TARGET ${target})
-        message(FATAL_ERROR "nullclap_enable_note_input_routing(${target}) requires an existing target")
-    endif()
-    target_compile_definitions(${target} PRIVATE NULLCLAP_ROUTE_NOTE_INPUT_AS_NOTE_EFFECT=1)
-endfunction()
