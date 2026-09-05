@@ -1,8 +1,8 @@
 #include <nullclap/State.hpp>
 
 #include <bit>
+#include <cmath>
 #include <cstdint>
-#include <limits>
 
 namespace nullclap::state
 {
@@ -12,6 +12,8 @@ constexpr std::byte magic[] {
     static_cast<std::byte>('N'), static_cast<std::byte>('C'),
     static_cast<std::byte>('L'), static_cast<std::byte>('P')
 };
+// Bound both allocation and work from the untrusted count in a state stream.
+constexpr std::uint32_t maximumParameterCount = 1u << 20;
 
 bool writeBytes(const clap_ostream_t* stream, const std::byte* data, std::size_t size) noexcept
 {
@@ -21,8 +23,9 @@ bool writeBytes(const clap_ostream_t* stream, const std::byte* data, std::size_t
     std::size_t written = 0;
     while (written < size)
     {
-        const auto result = stream->write(stream, data + written, static_cast<std::uint64_t>(size - written));
-        if (result <= 0)
+        const auto remaining = size - written;
+        const auto result = stream->write(stream, data + written, static_cast<std::uint64_t>(remaining));
+        if (result <= 0 || static_cast<std::uint64_t>(result) > remaining)
             return false;
         written += static_cast<std::size_t>(result);
     }
@@ -37,8 +40,9 @@ bool readBytes(const clap_istream_t* stream, std::byte* data, std::size_t size) 
     std::size_t read = 0;
     while (read < size)
     {
-        const auto result = stream->read(stream, data + read, static_cast<std::uint64_t>(size - read));
-        if (result <= 0)
+        const auto remaining = size - read;
+        const auto result = stream->read(stream, data + read, static_cast<std::uint64_t>(remaining));
+        if (result <= 0 || static_cast<std::uint64_t>(result) > remaining)
             return false;
         read += static_cast<std::size_t>(result);
     }
@@ -88,59 +92,87 @@ bool save(const ParameterStore& parameters,
           std::span<const std::byte> extraState,
           const clap_ostream_t* stream) noexcept
 {
-    if (extraState.size() > maximumExtraStateBytes)
-        return false;
-
-    const auto values = parameters.persistentValues();
-    if (values.size() > std::numeric_limits<std::uint32_t>::max())
-        return false;
-
-    if (!writeBytes(stream, magic, sizeof(magic))
-        || !writeU32(stream, formatVersion)
-        || !writeU32(stream, static_cast<std::uint32_t>(values.size()))
-        || !writeU32(stream, static_cast<std::uint32_t>(extraState.size())))
-        return false;
-
-    for (const auto& value : values)
+    // This public noexcept boundary owns allocations: callers cannot catch an
+    // allocation failure outside it once noexcept has called std::terminate.
+    try
     {
-        if (!writeU32(stream, value.id)
-            || !writeU64(stream, std::bit_cast<std::uint64_t>(value.value)))
+        if (extraState.size() > maximumExtraStateBytes)
             return false;
-    }
 
-    return extraState.empty() || writeBytes(stream, extraState.data(), extraState.size());
+        const auto values = parameters.persistentValues();
+        if (values.size() > maximumParameterCount)
+            return false;
+
+        if (!writeBytes(stream, magic, sizeof(magic))
+            || !writeU32(stream, formatVersion)
+            || !writeU32(stream, static_cast<std::uint32_t>(values.size()))
+            || !writeU32(stream, static_cast<std::uint32_t>(extraState.size())))
+            return false;
+
+        for (const auto& value : values)
+        {
+            if (!writeU32(stream, value.id)
+                || !writeU64(stream, std::bit_cast<std::uint64_t>(value.value)))
+                return false;
+        }
+
+        return extraState.empty() || writeBytes(stream, extraState.data(), extraState.size());
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 bool load(ParameterStore& parameters,
           std::vector<std::byte>& extraState,
           const clap_istream_t* stream) noexcept
 {
-    std::byte incomingMagic[4];
-    if (!readBytes(stream, incomingMagic, sizeof(incomingMagic)))
-        return false;
-    for (std::size_t i = 0; i < sizeof(magic); ++i)
-        if (incomingMagic[i] != magic[i])
-            return false;
-
-    std::uint32_t version = 0;
-    std::uint32_t parameterCount = 0;
-    std::uint32_t extraSize = 0;
-    if (!readU32(stream, version) || version != formatVersion
-        || !readU32(stream, parameterCount)
-        || !readU32(stream, extraSize)
-        || extraSize > maximumExtraStateBytes)
-        return false;
-
-    for (std::uint32_t i = 0; i < parameterCount; ++i)
+    try
     {
-        std::uint32_t id = 0;
-        std::uint64_t valueBits = 0;
-        if (!readU32(stream, id) || !readU64(stream, valueBits))
+        std::byte incomingMagic[4];
+        if (!readBytes(stream, incomingMagic, sizeof(incomingMagic)))
             return false;
-        parameters.restorePersistentValue(id, std::bit_cast<double>(valueBits));
-    }
+        for (std::size_t i = 0; i < sizeof(magic); ++i)
+            if (incomingMagic[i] != magic[i])
+                return false;
 
-    extraState.resize(extraSize);
-    return extraState.empty() || readBytes(stream, extraState.data(), extraState.size());
+        std::uint32_t version = 0;
+        std::uint32_t parameterCount = 0;
+        std::uint32_t extraSize = 0;
+        if (!readU32(stream, version) || version != formatVersion
+            || !readU32(stream, parameterCount) || parameterCount > maximumParameterCount
+            || !readU32(stream, extraSize) || extraSize > maximumExtraStateBytes)
+            return false;
+
+        // Decode completely before touching live parameters or the caller's extra
+        // state. A truncated stream must not leave a half-loaded preset behind.
+        std::vector<ParameterStore::SavedValue> incomingValues;
+        incomingValues.reserve(parameterCount);
+        for (std::uint32_t i = 0; i < parameterCount; ++i)
+        {
+            std::uint32_t id = 0;
+            std::uint64_t valueBits = 0;
+            if (!readU32(stream, id) || !readU64(stream, valueBits))
+                return false;
+            const double value = std::bit_cast<double>(valueBits);
+            if (!std::isfinite(value))
+                return false;
+            incomingValues.push_back({ id, value });
+        }
+
+        std::vector<std::byte> incomingExtra(extraSize);
+        if (!incomingExtra.empty() && !readBytes(stream, incomingExtra.data(), incomingExtra.size()))
+            return false;
+
+        for (const auto& value : incomingValues)
+            parameters.restorePersistentValue(value.id, value.value);
+        extraState.swap(incomingExtra);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 } // namespace nullclap::state
