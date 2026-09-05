@@ -5,6 +5,37 @@
 
 namespace nullclap
 {
+namespace
+{
+bool validEvent(const clap_event_header_t& event) noexcept
+{
+    if (event.size < sizeof(clap_event_header_t))
+        return false;
+    if (event.space_id != CLAP_CORE_EVENT_SPACE_ID)
+        return true;
+
+    std::size_t required = sizeof(clap_event_header_t);
+    switch (event.type)
+    {
+        case CLAP_EVENT_NOTE_ON:
+        case CLAP_EVENT_NOTE_OFF:
+        case CLAP_EVENT_NOTE_CHOKE:
+        case CLAP_EVENT_NOTE_END: required = sizeof(clap_event_note_t); break;
+        case CLAP_EVENT_NOTE_EXPRESSION: required = sizeof(clap_event_note_expression_t); break;
+        case CLAP_EVENT_PARAM_VALUE: required = sizeof(clap_event_param_value_t); break;
+        case CLAP_EVENT_PARAM_MOD: required = sizeof(clap_event_param_mod_t); break;
+        case CLAP_EVENT_PARAM_GESTURE_BEGIN:
+        case CLAP_EVENT_PARAM_GESTURE_END: required = sizeof(clap_event_param_gesture_t); break;
+        case CLAP_EVENT_TRANSPORT: required = sizeof(clap_event_transport_t); break;
+        case CLAP_EVENT_MIDI: required = sizeof(clap_event_midi_t); break;
+        case CLAP_EVENT_MIDI_SYSEX: required = sizeof(clap_event_midi_sysex_t); break;
+        case CLAP_EVENT_MIDI2: required = sizeof(clap_event_midi2_t); break;
+        default: break; // Preserve unknown/future event types for the application.
+    }
+    return event.size >= required;
+}
+}
+
 Plugin::Plugin(const clap_plugin_descriptor_t* descriptor, const clap_host_t* host)
     : HelperPlugin(descriptor, host)
 {
@@ -13,6 +44,12 @@ Plugin::Plugin(const clap_plugin_descriptor_t* descriptor, const clap_host_t* ho
 void Plugin::setGuiDelegate(std::unique_ptr<GuiDelegate> gui) noexcept
 {
     gui_ = std::move(gui);
+}
+
+bool Plugin::GuiParamQueue::canPush() const noexcept
+{
+    const auto next = (head_.load(std::memory_order_relaxed) + 1) % capacity;
+    return next != tail_.load(std::memory_order_acquire);
 }
 
 bool Plugin::GuiParamQueue::push(const GuiParamEvent& event) noexcept
@@ -26,14 +63,26 @@ bool Plugin::GuiParamQueue::push(const GuiParamEvent& event) noexcept
     return true;
 }
 
-bool Plugin::GuiParamQueue::pop(GuiParamEvent& event) noexcept
+bool Plugin::GuiParamQueue::peek(GuiParamEvent& event) const noexcept
 {
     const auto tail = tail_.load(std::memory_order_relaxed);
     if (tail == head_.load(std::memory_order_acquire))
         return false;
     event = events_[tail];
-    tail_.store((tail + 1) % capacity, std::memory_order_release);
     return true;
+}
+
+void Plugin::GuiParamQueue::consume() noexcept
+{
+    const auto tail = tail_.load(std::memory_order_relaxed);
+    tail_.store((tail + 1) % capacity, std::memory_order_release);
+}
+
+std::size_t Plugin::GuiParamQueue::available() const noexcept
+{
+    const auto head = head_.load(std::memory_order_acquire);
+    const auto tail = tail_.load(std::memory_order_acquire);
+    return (head + capacity - tail) % capacity;
 }
 
 bool Plugin::pushGuiParameterEvent(const GuiParamEvent& event) noexcept
@@ -42,24 +91,30 @@ bool Plugin::pushGuiParameterEvent(const GuiParamEvent& event) noexcept
         return false;
     if (_host.canUseParams())
         _host.paramsRequestFlush();
+    else
+        _host.requestProcess();
     return true;
 }
 
 bool Plugin::beginParameterGesture(clap_id id) noexcept
 {
-    return parameters_.contains(id) && pushGuiParameterEvent({ GuiParamEventKind::begin, id, 0.0 });
+    return parameters_.contains(id) && !parameters_.isReadOnly(id)
+        && pushGuiParameterEvent({ GuiParamEventKind::begin, id, 0.0 });
 }
 
 bool Plugin::setParameterFromGui(clap_id id, double value) noexcept
 {
-    if (parameters_.isReadOnly(id) || !parameters_.setBaseValue(id, value))
+    // There is only one producer. Once space is observed, the consumer can only
+    // make more room, so a rejected enqueue never changes the local base value.
+    if (!guiParamQueue_.canPush() || parameters_.isReadOnly(id) || !parameters_.setBaseValue(id, value))
         return false;
     return pushGuiParameterEvent({ GuiParamEventKind::value, id, parameters_.value(id) });
 }
 
 bool Plugin::endParameterGesture(clap_id id) noexcept
 {
-    return parameters_.contains(id) && pushGuiParameterEvent({ GuiParamEventKind::end, id, 0.0 });
+    return parameters_.contains(id) && !parameters_.isReadOnly(id)
+        && pushGuiParameterEvent({ GuiParamEventKind::end, id, 0.0 });
 }
 
 bool Plugin::init() noexcept
@@ -94,11 +149,23 @@ void Plugin::reset() noexcept
 
 void Plugin::onMainThread() noexcept
 {
+    if (guiFlushRetryPending_.exchange(false, std::memory_order_acq_rel)
+        && guiParamQueue_.available() != 0)
+    {
+        // request_flush is not an audio-thread API. A rejected output event asks
+        // for this main-thread callback instead of calling request_flush in DSP.
+        if (_host.canUseParams())
+            _host.paramsRequestFlush();
+        else
+            _host.requestProcess();
+    }
     onMainThreadCallback();
 }
 
 void Plugin::applyInputEvent(const clap_event_header_t& event) noexcept
 {
+    if (!validEvent(event))
+        return;
     parameters_.applyInputEvent(event);
     onEvent(event);
 }
@@ -111,23 +178,21 @@ clap_process_status Plugin::process(const clap_process_t* process) noexcept
     currentProcess_ = process;
     currentOutputEvents_ = process->out_events;
     currentFrameCount_ = process->frames_count;
-    drainGuiParameterEvents(process->out_events, 0);
+    if (process->frames_count != 0)
+        drainGuiParameterEvents(process->out_events, 0);
 
     std::uint32_t cursor = 0;
     const auto* events = process->in_events;
-    const std::uint32_t eventCount = events != nullptr && events->size != nullptr ? events->size(events) : 0;
+    const std::uint32_t eventCount = events != nullptr && events->size != nullptr && events->get != nullptr
+        ? events->size(events) : 0;
 
     for (std::uint32_t index = 0; index < eventCount; ++index)
     {
         const auto* event = events->get(events, index);
-        if (event == nullptr)
+        if (event == nullptr || !validEvent(*event))
             continue;
 
-        // CLAP event timestamps are sample offsets within the current process buffer.
-        // An event at frames_count (or beyond it) is outside the range we actually
-        // process, so it must not mutate plugin state during this call. Hosts deliver
-        // events sorted by time, which lets us stop once the first out-of-range event
-        // is encountered.
+        // Valid sample offsets are [0, frames_count). CLAP input is time-sorted.
         if (event->time >= process->frames_count)
             break;
 
@@ -181,7 +246,7 @@ bool Plugin::paramsTextToValue(clap_id id, const char* display, double* value) n
 
 void Plugin::paramsFlush(const clap_input_events_t* in, const clap_output_events_t* out) noexcept
 {
-    if (in != nullptr && in->size != nullptr)
+    if (in != nullptr && in->size != nullptr && in->get != nullptr)
     {
         const auto count = in->size(in);
         for (std::uint32_t index = 0; index < count; ++index)
@@ -206,23 +271,33 @@ bool Plugin::stateSave(const clap_ostream_t* stream) noexcept
 
 bool Plugin::stateLoad(const clap_istream_t* stream) noexcept
 {
+    std::vector<ParameterStore::SavedValue> previousValues;
+    bool parametersApplied = false;
     try
     {
+        previousValues = parameters_.persistentValues();
         std::vector<std::byte> extra;
         if (!state::load(parameters_, extra, stream))
             return false;
-        if (!loadExtraState(extra))
-            return false;
+        parametersApplied = true;
 
-        if (_host.canUseParams())
-            _host.paramsRescan(CLAP_PARAM_RESCAN_VALUES);
-
-        return true;
+        // Keep the existing hook contract: applications see the new parameters
+        // while loading their own payload, but failure restores the old values.
+        if (loadExtraState(extra))
+        {
+            if (_host.canUseParams())
+                _host.paramsRescan(CLAP_PARAM_RESCAN_VALUES);
+            return true;
+        }
     }
     catch (...)
     {
-        return false;
     }
+
+    if (parametersApplied)
+        for (const auto& saved : previousValues)
+            parameters_.restorePersistentValue(saved.id, saved.value);
+    return false;
 }
 
 std::uint32_t Plugin::audioPortsCount(bool isInput) const noexcept
@@ -379,7 +454,7 @@ bool Plugin::pushParameterValue(const clap_output_events_t* out,
 
 bool Plugin::emitParameterValue(clap_id id, double value, std::uint32_t sampleOffset, std::uint32_t flags) noexcept
 {
-    if (currentOutputEvents_ == nullptr || sampleOffset > currentFrameCount_)
+    if (currentOutputEvents_ == nullptr || sampleOffset >= currentFrameCount_)
         return false;
     if (!parameters_.setInternalValue(id, value))
         return false;
@@ -391,25 +466,43 @@ void Plugin::drainGuiParameterEvents(const clap_output_events_t* out, std::uint3
     if (out == nullptr || out->try_push == nullptr)
         return;
 
-    GuiParamEvent queued;
-    while (guiParamQueue_.pop(queued))
+    // Snapshot the work budget: a producer filling the queue concurrently must
+    // not turn an audio callback into an unbounded drain loop.
+    const auto count = guiParamQueue_.available();
+    for (std::size_t index = 0; index < count; ++index)
     {
+        GuiParamEvent queued;
+        if (!guiParamQueue_.peek(queued))
+            break;
+
+        bool accepted = false;
         if (queued.kind == GuiParamEventKind::value)
         {
-            pushParameterValue(out, queued.id, queued.value, sampleOffset, CLAP_EVENT_IS_LIVE);
-            continue;
+            accepted = pushParameterValue(out, queued.id, queued.value, sampleOffset, CLAP_EVENT_IS_LIVE);
+        }
+        else
+        {
+            clap_event_param_gesture_t event {};
+            event.header.size = sizeof(event);
+            event.header.time = sampleOffset;
+            event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+            event.header.type = queued.kind == GuiParamEventKind::begin
+                ? CLAP_EVENT_PARAM_GESTURE_BEGIN
+                : CLAP_EVENT_PARAM_GESTURE_END;
+            event.header.flags = CLAP_EVENT_IS_LIVE;
+            event.param_id = queued.id;
+            accepted = out->try_push(out, &event.header);
         }
 
-        clap_event_param_gesture_t event {};
-        event.header.size = sizeof(event);
-        event.header.time = sampleOffset;
-        event.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        event.header.type = queued.kind == GuiParamEventKind::begin
-            ? CLAP_EVENT_PARAM_GESTURE_BEGIN
-            : CLAP_EVENT_PARAM_GESTURE_END;
-        event.header.flags = CLAP_EVENT_IS_LIVE;
-        event.param_id = queued.id;
-        out->try_push(out, &event.header);
+        if (!accepted)
+        {
+            // Leave the rejected event (and everything after it) in FIFO order.
+            // request_callback is thread-safe; request_flush is not audio-safe.
+            if (!guiFlushRetryPending_.exchange(true, std::memory_order_acq_rel))
+                _host.requestCallback();
+            break;
+        }
+        guiParamQueue_.consume();
     }
 }
 } // namespace nullclap

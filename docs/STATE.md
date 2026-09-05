@@ -19,19 +19,21 @@ repeat parameter count:
 N bytes  plug-in-specific extra state
 ```
 
-The extra-state payload is capped at 16 MiB as a defensive bound.
+The extra-state payload is capped at 16 MiB. The parameter count is capped at 1,048,576 records to bound allocation and parsing work. These are defensive limits, not new fields: existing valid v1 states remain compatible.
 
 ## Parameter migration
 
-State stores `(id, value)` pairs, not parameter indexes. Unknown IDs are skipped on load. Missing parameters keep their current/default value. This lets parameters be reordered freely and permits additive schema evolution.
+State stores `(id, value)` pairs, not parameter indexes. Unknown IDs are skipped on load. Missing parameters keep their current/default value. Repeated IDs use the last value. This permits additive schema evolution and parameter reordering; changing a stable parameter ID is still a breaking migration.
 
-Changing a stable parameter ID is still a breaking state migration.
+Writable parameters always participate in host state. Read-only telemetry can opt out with `persistent = false`.
 
-## Host synchronization after load
+## Parsing and failure behavior
 
-Restoring state changes the framework's persistent parameter values directly. A CLAP host may cache parameter values, so a successful load must also tell the host to query those values again.
+`state::load()` validates and stages the entire parameter list and extra payload before applying anything. Truncated data, unsupported versions, excessive counts, non-finite values, stream errors, or allocation failure return `false` without changing framework parameters or the caller's extra-state vector.
 
-`nullclap::Plugin::stateLoad()` therefore calls `paramsRescan(CLAP_PARAM_RESCAN_VALUES)` after both the framework parameter state and the plug-in-specific extra state have loaded successfully. Do not remove this notification or defer it into the audio callback. It is part of the state restoration contract and is covered by `clap-validator`'s state reproducibility tests.
+Streams may return fewer bytes than requested; the reader/writer loops until the operation completes. Zero progress, negative results, and byte counts larger than the requested transfer fail. Stream callbacks must obey the CLAP C ABI and must not throw exceptions or write outside the supplied buffer.
+
+The public `state::save()` and `state::load()` functions catch their own allocation failures inside their `noexcept` boundaries. A failed save can leave a partial stream; the host must discard a save for which `false` was returned.
 
 ## Extra application state
 
@@ -42,9 +44,15 @@ std::vector<std::byte> saveExtraState() const;
 bool loadExtraState(std::span<const std::byte> bytes);
 ```
 
-Use this only for state that is not naturally a CLAP parameter: editor topology, serialized tables, user data, etc. Keep ordinary knobs in `ParameterStore` so automation, remote controls and state share one source of truth.
+Use this for state that is not naturally a CLAP parameter: editor topology, serialized tables, user data, etc. Keep ordinary knobs in `ParameterStore` so automation, remote controls and state share one source of truth.
 
-`loadExtraState()` is transactional from the framework's point of view: if it returns `false`, the overall CLAP state load reports failure and the host rescan is not issued. Plug-ins should validate their extra payload before committing application-specific changes when practical.
+`Plugin::stateLoad()` preserves the existing hook contract: newly restored parameter values are visible inside `loadExtraState()`. If that hook returns `false` or throws, the framework restores the previous persistent parameter values and reports failure. This is a failure rollback, not a cross-thread atomic snapshot.
+
+The framework cannot roll back opaque application objects. Validate and stage the extra payload before committing application-specific changes; a rejecting or throwing hook must not leave its own objects partially changed. It must not register/remove parameters during loading.
+
+## Host synchronization after load
+
+After both framework state and application state load successfully, `Plugin::stateLoad()` calls `paramsRescan(CLAP_PARAM_RESCAN_VALUES)` so the host refreshes cached parameter values. Failed loads do not issue that rescan. Keep this notification on the state/main-thread path, not in DSP.
 
 ## Version changes
 

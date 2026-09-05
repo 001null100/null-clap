@@ -41,8 +41,9 @@ public:
 
     void setGuiDelegate(std::unique_ptr<GuiDelegate> gui) noexcept;
 
-    // Main/UI-thread API. These calls update the local value immediately and queue
-    // the corresponding CLAP event for the host.
+    // Single-producer main/UI-thread API. Accepted values update locally at once.
+    // False means the edit was not accepted; callers must retry rather than assume
+    // delivery. In particular, do not abandon a rejected gesture-end request.
     bool beginParameterGesture(clap_id id) noexcept;
     bool setParameterFromGui(clap_id id, double value) noexcept;
     bool endParameterGesture(clap_id id) noexcept;
@@ -62,12 +63,14 @@ protected:
                               std::uint32_t startFrame,
                               std::uint32_t endFrame) noexcept = 0;
 
-    // Receives every core/non-core input event after framework parameter handling.
+    // Receives structurally valid core/non-core events after parameter handling.
     // This is also where polyphonic parameter events are intentionally surfaced.
     virtual void onEvent(const clap_event_header_t&) noexcept {}
     virtual clap_process_status processFinished() noexcept { return CLAP_PROCESS_CONTINUE; }
 
     virtual std::vector<std::byte> saveExtraState() const { return {}; }
+    // New parameter values are visible here. Validate application state before
+    // committing it; the framework rolls back parameters on false or exception.
     virtual bool loadExtraState(std::span<const std::byte>) { return true; }
 
     // Valid only while process(), processAudio(), onEvent(), or processFinished()
@@ -79,6 +82,7 @@ protected:
     void markStateDirty() noexcept;
 
     // Audio-thread helper for plug-in-generated/read-only parameter telemetry.
+    // sampleOffset must be strictly less than the current block's frames_count.
     bool emitParameterValue(clap_id id,
                             double value,
                             std::uint32_t sampleOffset,
@@ -96,8 +100,11 @@ private:
     class GuiParamQueue
     {
     public:
+        bool canPush() const noexcept;
         bool push(const GuiParamEvent& event) noexcept;
-        bool pop(GuiParamEvent& event) noexcept;
+        bool peek(GuiParamEvent& event) const noexcept;
+        void consume() noexcept;
+        std::size_t available() const noexcept;
 
     private:
         static constexpr std::size_t capacity = 256;
@@ -171,6 +178,7 @@ private:
     RemoteControls remoteControls_;
     std::unique_ptr<GuiDelegate> gui_;
     GuiParamQueue guiParamQueue_;
+    std::atomic<bool> guiFlushRetryPending_ { false };
     const clap_process_t* currentProcess_ = nullptr;
     const clap_output_events_t* currentOutputEvents_ = nullptr;
     std::uint32_t currentFrameCount_ = 0;

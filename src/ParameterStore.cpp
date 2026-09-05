@@ -21,14 +21,25 @@ void copyClapString(char* destination, std::size_t capacity, const std::string& 
 
 bool ParameterStore::add(ParameterSpec spec)
 {
-    if (spec.id == CLAP_INVALID_ID || spec.name.empty() || spec.maximum < spec.minimum || byId_.contains(spec.id))
+    if (spec.id == CLAP_INVALID_ID || spec.name.empty() || byId_.contains(spec.id)
+        || !std::isfinite(spec.minimum) || !std::isfinite(spec.maximum)
+        || !std::isfinite(spec.defaultValue) || spec.maximum < spec.minimum)
         return false;
 
     spec.defaultValue = clampAndQuantize(spec, spec.defaultValue);
     auto parameter = std::make_unique<Parameter>(std::move(spec));
     auto* pointer = parameter.get();
     byId_.emplace(pointer->spec.id, pointer);
-    parameters_.push_back(std::move(parameter));
+    try
+    {
+        parameters_.push_back(std::move(parameter));
+    }
+    catch (...)
+    {
+        // Do not leave a dangling lookup entry if the owning vector cannot grow.
+        byId_.erase(pointer->spec.id);
+        throw;
+    }
     return true;
 }
 
@@ -107,7 +118,8 @@ bool ParameterStore::setInternalValue(clap_id id, double newValue) noexcept
 bool ParameterStore::setModulation(clap_id id, double amount) noexcept
 {
     auto* parameter = find(id);
-    if (parameter == nullptr || (parameter->spec.flags & CLAP_PARAM_IS_MODULATABLE) == 0)
+    if (parameter == nullptr || (parameter->spec.flags & CLAP_PARAM_IS_MODULATABLE) == 0
+        || !std::isfinite(amount))
         return false;
 
     parameter->modulationAmount.store(amount, std::memory_order_relaxed);
@@ -123,10 +135,12 @@ bool ParameterStore::valueToText(clap_id id, double rawValue, char* display, std
     const double value = clampAndQuantize(parameter->spec, rawValue);
     if (!parameter->spec.valueLabels.empty())
     {
-        const auto index = static_cast<std::size_t>(std::llround(value - parameter->spec.minimum));
-        if (index < parameter->spec.valueLabels.size())
+        // Check in floating point before converting: a continuous parameter with
+        // a very large range must not overflow an integer just to format a label.
+        const double index = std::round(value - parameter->spec.minimum);
+        if (index >= 0.0 && index < static_cast<double>(parameter->spec.valueLabels.size()))
         {
-            std::snprintf(display, size, "%s", parameter->spec.valueLabels[index].c_str());
+            std::snprintf(display, size, "%s", parameter->spec.valueLabels[static_cast<std::size_t>(index)].c_str());
             return true;
         }
     }
@@ -149,7 +163,7 @@ bool ParameterStore::textToValue(clap_id id, const char* display, double& outVal
     {
         if (parameter->spec.valueLabels[index] == display)
         {
-            outValue = parameter->spec.minimum + static_cast<double>(index);
+            outValue = clampAndQuantize(parameter->spec, parameter->spec.minimum + static_cast<double>(index));
             return true;
         }
     }
