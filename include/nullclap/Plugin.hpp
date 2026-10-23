@@ -47,6 +47,17 @@ public:
     bool setParameterFromGui(clap_id id, double value) noexcept;
     bool endParameterGesture(clap_id id) noexcept;
 
+    // Main-thread wrappers for the host's CLAP timer-support extension. Ticks are
+    // delivered to onHostTimer() and then to the installed GuiDelegate. Returns
+    // false when the host does not provide timer-support.
+    bool registerHostTimer(std::uint32_t periodMs, clap_id& timerId) noexcept;
+    bool unregisterHostTimer(clap_id timerId) noexcept;
+
+    // Main-thread request for the host to resize the embedding window, in the
+    // physical pixels CLAP uses for Win32 and X11. Public so a GuiDelegate can
+    // report a size change it discovers itself, such as a toolkit display scale.
+    bool requestGuiResize(std::uint32_t width, std::uint32_t height) noexcept;
+
 protected:
     virtual bool onInit() noexcept { return true; }
     virtual bool onActivate(double, std::uint32_t, std::uint32_t) noexcept { return true; }
@@ -55,6 +66,7 @@ protected:
     virtual void onStopProcessing() noexcept {}
     virtual void onReset() noexcept {}
     virtual void onMainThreadCallback() noexcept {}
+    virtual void onHostTimer(clap_id) noexcept {}
 
     // Called for each contiguous sample span between input events. Parameter state
     // already reflects every event at startFrame and remains constant until endFrame.
@@ -75,7 +87,6 @@ protected:
     // or other process-level data in a second framework abstraction.
     const clap_process_t* currentProcess() const noexcept { return currentProcess_; }
 
-    bool requestGuiResize(std::uint32_t width, std::uint32_t height) noexcept;
     void markStateDirty() noexcept;
 
     // Audio-thread helper for plug-in-generated/read-only parameter telemetry.
@@ -155,6 +166,9 @@ private:
     void guiSuggestTitle(const char* title) noexcept override;
     bool guiSetParent(const clap_window_t* window) noexcept override;
     bool guiSetTransient(const clap_window_t* window) noexcept override;
+
+    bool implementsTimerSupport() const noexcept override { return true; }
+    void onTimer(clap_id timerId) noexcept override;
 
     void applyInputEvent(const clap_event_header_t& event) noexcept;
     void drainGuiParameterEvents(const clap_output_events_t* out, std::uint32_t sampleOffset) noexcept;

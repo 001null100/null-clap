@@ -27,9 +27,20 @@ function(nullclap_add_plugin target)
         OUTPUT_NAME "${_nullclap_output_name}"
         LIBRARY_OUTPUT_DIRECTORY "${_nullclap_output_dir}"
         RUNTIME_OUTPUT_DIRECTORY "${_nullclap_output_dir}"
+        C_VISIBILITY_PRESET hidden
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN YES
     )
+
+    # ELF modules export every default-visibility symbol, including code pulled
+    # in from static libraries (null-clap, clap-helpers) and bundled C libraries
+    # (e.g. JUCE's zlib/libpng). Two plug-ins in one host process would then
+    # interpose each other's copies. CLAP only needs clap_entry.
+    if(UNIX AND NOT APPLE)
+        set(_nullclap_exports_map "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/NullClapExports.map")
+        target_link_options(${target} PRIVATE "LINKER:--version-script=${_nullclap_exports_map}")
+        set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS "${_nullclap_exports_map}")
+    endif()
 
     foreach(config Debug Release RelWithDebInfo MinSizeRel)
         string(TOUPPER "${config}" config_upper)

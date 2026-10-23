@@ -30,5 +30,10 @@ public:
     virtual void suggestTitle(const char*) noexcept {}
     virtual bool setParent(const clap_window_t& window) noexcept = 0;
     virtual bool setTransient(const clap_window_t&) noexcept { return false; }
+
+    // Main-thread tick for a timer the delegate registered through
+    // Plugin::registerHostTimer(). X11 toolkits such as JUCE have no message
+    // thread of their own inside a host and rely on this to pump their event loop.
+    virtual void onTimer(clap_id) noexcept {}
 };
 } // namespace nullclap

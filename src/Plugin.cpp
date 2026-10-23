@@ -341,6 +341,25 @@ bool Plugin::guiSetTransient(const clap_window_t* window) noexcept
     return gui_ != nullptr && window != nullptr && gui_->setTransient(*window);
 }
 
+bool Plugin::registerHostTimer(std::uint32_t periodMs, clap_id& timerId) noexcept
+{
+    timerId = CLAP_INVALID_ID;
+    return _host.canUseTimerSupport() && _host.timerSupportRegister(periodMs, &timerId);
+}
+
+bool Plugin::unregisterHostTimer(clap_id timerId) noexcept
+{
+    return timerId != CLAP_INVALID_ID && _host.canUseTimerSupport()
+        && _host.timerSupportUnregister(timerId);
+}
+
+void Plugin::onTimer(clap_id timerId) noexcept
+{
+    onHostTimer(timerId);
+    if (gui_ != nullptr)
+        gui_->onTimer(timerId);
+}
+
 bool Plugin::requestGuiResize(std::uint32_t width, std::uint32_t height) noexcept
 {
     return _host.canUseGui() && _host.guiRequestResize(width, height);

@@ -34,9 +34,12 @@ Do not place dynamically resized structures behind these atomics and assume that
 
 ## Host calls
 
-Only call a CLAP host callback from a thread permitted by that callback's specification. `nullclap::Plugin` currently wraps two common main-thread requests:
+Only call a CLAP host callback from a thread permitted by that callback's specification. `nullclap::Plugin` currently wraps these common main-thread requests:
 
 - `requestGuiResize()`
 - `markStateDirty()`
+- `registerHostTimer()` / `unregisterHostTimer()` (CLAP `timer-support`)
+
+Host timer ticks arrive on the main thread through `onHostTimer()` and then `GuiDelegate::onTimer()`.
 
 GUI parameter enqueueing requests a host parameter flush from its main/UI path. Plug-in-specific host extension calls should remain explicit until a reusable pattern emerges.
